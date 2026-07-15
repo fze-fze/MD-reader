@@ -61,7 +61,7 @@ final class DocumentSession: Identifiable {
 
         await openIfNeeded()
         guard isOpen else {
-            throw sessionError("文稿尚未准备好，请稍后重试。")
+            throw sessionError(L10n.string("document.error.not_ready"))
         }
 
         let sourceURL = fileURL
@@ -93,13 +93,13 @@ final class DocumentSession: Identifiable {
     private func saveCurrentDocument() async throws {
         document.replaceText(with: text, markingChanged: true)
         guard await document.saveDocument(to: fileURL) else {
-            throw sessionError("保存当前修改时出现问题，文稿尚未重新命名。")
+            throw sessionError(L10n.string("document.error.save_before_rename"))
         }
     }
 
     private func closeCurrentDocument() async throws {
         guard await document.closeDocument() else {
-            throw sessionError("关闭旧文件会话时出现问题，文稿尚未重新命名。")
+            throw sessionError(L10n.string("document.error.close_before_rename"))
         }
         isOpen = false
     }
@@ -107,7 +107,7 @@ final class DocumentSession: Identifiable {
     private func reopenDocument(at url: URL) async throws {
         let replacement = MarkdownUIDocument(fileURL: url, initialText: text)
         guard await replacement.openDocument() else {
-            throw sessionError("无法在新位置重新打开文稿。")
+            throw sessionError(L10n.string("document.error.reopen_after_rename"))
         }
         replacement.replaceText(with: text, markingChanged: false)
         document = replacement

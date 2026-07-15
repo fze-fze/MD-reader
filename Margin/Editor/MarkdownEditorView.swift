@@ -41,10 +41,30 @@ struct MarkdownEditorView: View {
         case .heading1: setHeadingPrefix("# ")
         case .heading2: setHeadingPrefix("## ")
         case .heading3: setHeadingPrefix("### ")
-        case .bold: wrapSelection(prefix: "**", suffix: "**", placeholder: "重点")
-        case .italic: wrapSelection(prefix: "_", suffix: "_", placeholder: "强调")
-        case .link: wrapSelection(prefix: "[", suffix: "](https://)", placeholder: "链接文字")
-        case .code: wrapSelection(prefix: "`", suffix: "`", placeholder: "代码")
+        case .bold:
+            wrapSelection(
+                prefix: "**",
+                suffix: "**",
+                placeholder: L10n.string("editor.placeholder.bold")
+            )
+        case .italic:
+            wrapSelection(
+                prefix: "_",
+                suffix: "_",
+                placeholder: L10n.string("editor.placeholder.italic")
+            )
+        case .link:
+            wrapSelection(
+                prefix: "[",
+                suffix: "](https://)",
+                placeholder: L10n.string("editor.placeholder.link")
+            )
+        case .code:
+            wrapSelection(
+                prefix: "`",
+                suffix: "`",
+                placeholder: L10n.string("editor.placeholder.code")
+            )
         case .quote: prefixCurrentLine("> ")
         case .list: prefixCurrentLine("- ")
         case .task: prefixCurrentLine("- [ ] ")

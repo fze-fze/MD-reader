@@ -28,7 +28,7 @@ struct NativeMarkdownTextView: UIViewRepresentable {
         view.smartDashesType = .no
         view.smartQuotesType = .no
         view.smartInsertDeleteType = .no
-        view.accessibilityLabel = "Markdown 编辑器"
+        view.accessibilityLabel = L10n.string("editor.accessibility_label")
         view.text = text
         applyTypography(to: view)
         return view

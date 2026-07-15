@@ -151,12 +151,12 @@
 				};
 			};
 			buildConfigurationList = A100000000000000000000C1 /* Build configuration list for PBXProject "Margin" */;
-			developmentRegion = "zh-Hans";
+			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
+				en,
 				"zh-Hans",
 				Base,
-				en,
 			);
 			mainGroup = A10000000000000000000002;
 			minimizedProjectReferenceProxies = 1;

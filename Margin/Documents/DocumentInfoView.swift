@@ -9,24 +9,36 @@ struct DocumentInfoView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("文档") {
-                    LabeledContent("名称", value: fileURL?.lastPathComponent ?? "未命名.md")
+                Section("document.section.document") {
+                    LabeledContent(
+                        "document.name",
+                        value: fileURL?.lastPathComponent ?? L10n.string("document.untitled_filename")
+                    )
                     if let fileURL {
-                        LabeledContent("位置", value: fileURL.deletingLastPathComponent().lastPathComponent)
+                        LabeledContent(
+                            "document.location",
+                            value: fileURL.deletingLastPathComponent().lastPathComponent
+                        )
                     }
                 }
-                Section("统计") {
-                    LabeledContent("字数", value: statistics.words.formatted())
-                    LabeledContent("字符", value: statistics.characters.formatted())
-                    LabeledContent("行数", value: statistics.lines.formatted())
-                    LabeledContent("预计阅读", value: "\(statistics.readingMinutes) 分钟")
+                Section("document.section.statistics") {
+                    LabeledContent("document.words", value: statistics.words.formatted())
+                    LabeledContent("document.characters", value: statistics.characters.formatted())
+                    LabeledContent("document.lines", value: statistics.lines.formatted())
+                    LabeledContent(
+                        "document.estimated_reading",
+                        value: L10n.format(
+                            "document.reading_minutes",
+                            Int64(statistics.readingMinutes)
+                        )
+                    )
                 }
             }
-            .navigationTitle("文档信息")
+            .navigationTitle("document.info.title")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("完成") { dismiss() }
+                    Button("common.done") { dismiss() }
                 }
             }
         }

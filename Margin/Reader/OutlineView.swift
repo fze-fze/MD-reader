@@ -13,9 +13,9 @@ struct OutlineView: View {
             Group {
                 if headings.isEmpty {
                     ContentUnavailableView(
-                        "没有目录",
+                        "outline.empty_title",
                         systemImage: "list.bullet.indent",
-                        description: Text("添加 Markdown 标题后，它们会出现在这里。")
+                        description: Text("outline.empty_description")
                     )
                 } else {
                     List(headings) { heading in
@@ -37,11 +37,11 @@ struct OutlineView: View {
                     .background(theme.sidebarSurface)
                 }
             }
-            .navigationTitle("目录")
+            .navigationTitle("outline.title")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("完成") { dismiss() }
+                    Button("common.done") { dismiss() }
                 }
             }
         }

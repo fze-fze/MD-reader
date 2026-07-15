@@ -26,7 +26,7 @@ enum QuickActionDocumentCreator {
                 }
             }
         } catch {
-            assertionFailure("无法创建快捷操作文稿：\(error.localizedDescription)")
+            assertionFailure("Quick action document creation failed: \(error.localizedDescription)")
         }
     }
 
@@ -50,7 +50,8 @@ enum QuickActionDocumentCreator {
 
         for index in 1...9_999 {
             let suffix = index == 1 ? "" : " \(index)"
-            let candidate = folder.appendingPathComponent("新建文稿\(suffix).md")
+            let baseName = L10n.string("quick_action.default_filename")
+            let candidate = folder.appendingPathComponent("\(baseName)\(suffix).md")
             if !FileManager.default.fileExists(atPath: candidate.path) {
                 return candidate
             }

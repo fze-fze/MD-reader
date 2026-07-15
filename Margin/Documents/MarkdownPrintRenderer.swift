@@ -5,7 +5,7 @@ enum MarkdownPrintRenderer {
         let body = MarkdownParser.parse(source).map { html(for: $0, baseURL: baseURL) }.joined(separator: "\n")
         return """
         <!doctype html>
-        <html lang="zh-CN">
+        <html lang="\(htmlLanguageCode)">
         <head>
         <meta charset="utf-8">
         <title>\(escape(title))</title>
@@ -44,6 +44,10 @@ enum MarkdownPrintRenderer {
         </body>
         </html>
         """
+    }
+
+    private static var htmlLanguageCode: String {
+        Bundle.main.preferredLocalizations.first == "zh-Hans" ? "zh-CN" : "en"
     }
 
     private static func html(for block: MarkdownBlock, baseURL: URL?) -> String {

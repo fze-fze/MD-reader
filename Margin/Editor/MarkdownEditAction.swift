@@ -17,17 +17,17 @@ enum MarkdownEditAction: Identifiable {
 
     var label: String {
         switch self {
-        case .body: "正文"
-        case .heading1: "标题 1"
-        case .heading2: "标题 2"
-        case .heading3: "标题 3"
-        case .bold: "粗体"
-        case .italic: "斜体"
-        case .link: "链接"
-        case .code: "行内代码"
-        case .quote: "引用"
-        case .list: "项目列表"
-        case .task: "任务列表"
+        case .body: L10n.string("editor.body")
+        case .heading1: L10n.string("editor.heading1")
+        case .heading2: L10n.string("editor.heading2")
+        case .heading3: L10n.string("editor.heading3")
+        case .bold: L10n.string("editor.bold")
+        case .italic: L10n.string("editor.italic")
+        case .link: L10n.string("editor.link")
+        case .code: L10n.string("editor.inline_code")
+        case .quote: L10n.string("editor.quote")
+        case .list: L10n.string("editor.bullet_list")
+        case .task: L10n.string("editor.task_list")
         }
     }
 

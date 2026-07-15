@@ -17,7 +17,7 @@ struct ThemePickerView: View {
             }
             .padding(20)
         }
-        .navigationTitle("选取主题")
+        .navigationTitle("theme.picker.title")
         .navigationBarTitleDisplayMode(.inline)
     }
 }
@@ -67,12 +67,12 @@ private struct ThemePreviewCard: View {
         .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
-        .accessibilityHint("选择此文稿主题")
+        .accessibilityHint(Text("theme.picker.hint"))
     }
 
     private var preview: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Aa 文稿")
+            Text("theme.preview")
                 .font(MarkdownTypography.documentFont(theme: theme, size: 14, weight: .semibold))
                 .foregroundStyle(palette.textStrong)
             RoundedRectangle(cornerRadius: 2)

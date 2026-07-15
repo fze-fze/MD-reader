@@ -138,14 +138,22 @@ private struct SearchMatchBadge: View {
 
     var body: some View {
         HStack(spacing: 2) {
-            Text(count == 0 ? "没有匹配项" : "\(current) / \(count)")
+            Text(
+                count == 0
+                    ? L10n.string("reader.no_matches")
+                    : L10n.format(
+                        "reader.match_position",
+                        Int64(current),
+                        Int64(count)
+                    )
+            )
                 .font(.footnote.monospacedDigit())
                 .padding(.horizontal, 8)
-            Button("上一个匹配项", systemImage: "chevron.up", action: onPrevious)
+            Button("reader.previous_match", systemImage: "chevron.up", action: onPrevious)
                 .labelStyle(.iconOnly)
                 .frame(minWidth: 44, minHeight: 44)
                 .disabled(count == 0)
-            Button("下一个匹配项", systemImage: "chevron.down", action: onNext)
+            Button("reader.next_match", systemImage: "chevron.down", action: onNext)
                 .labelStyle(.iconOnly)
                 .frame(minWidth: 44, minHeight: 44)
                 .disabled(count == 0)
@@ -244,7 +252,7 @@ private struct MarkdownBlockView: View {
         .background(theme.quoteFill, in: RoundedRectangle(cornerRadius: 10))
         .padding(.vertical, bodySize * 0.39)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("引用：\(text)")
+        .accessibilityLabel(L10n.format("reader.quote_accessibility", text))
     }
 
     private func list(_ items: [MarkdownListItem], ordered: Bool) -> some View {
@@ -292,8 +300,20 @@ private struct MarkdownBlockView: View {
                     .frame(width: 44, height: 44)
                     .contentShape(.rect)
                     .accessibilityLabel(item.text)
-                    .accessibilityValue(item.isChecked == true ? "已完成" : "未完成")
-                    .accessibilityHint(item.isChecked == true ? "轻点标记为未完成" : "轻点标记为已完成")
+                    .accessibilityValue(
+                        L10n.string(
+                            item.isChecked == true
+                                ? "reader.task.completed"
+                                : "reader.task.incomplete"
+                        )
+                    )
+                    .accessibilityHint(
+                        L10n.string(
+                            item.isChecked == true
+                                ? "reader.task.mark_incomplete_hint"
+                                : "reader.task.mark_completed_hint"
+                        )
+                    )
                     .sensoryFeedback(.selection, trigger: item.isChecked)
 
                     InlineMarkdownText(
@@ -316,7 +336,7 @@ private struct MarkdownBlockView: View {
     private func codeBlock(language: String?, source: String) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text(language?.uppercased() ?? "代码")
+                Text(language?.uppercased() ?? L10n.string("reader.code"))
                     .font(.caption)
                     .foregroundStyle(theme.textSecondary)
                 Spacer()
@@ -345,7 +365,10 @@ private struct MarkdownBlockView: View {
         .padding(.top, 14)
         .padding(.bottom, 18)
         .accessibilityElement(children: .contain)
-        .accessibilityLabel(language.map { "\($0) 代码块" } ?? "代码块")
+        .accessibilityLabel(
+            language.map { L10n.format("reader.code_block_language", $0) }
+                ?? L10n.string("reader.code_block")
+        )
     }
 
     private func table(headers: [String], rows: [[String]]) -> some View {
@@ -394,7 +417,13 @@ private struct MarkdownBlockView: View {
         .scrollIndicators(.hidden)
         .padding(.vertical, bodySize * 0.39)
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("表格，\(headers.count) 列，\(rows.count) 行")
+        .accessibilityLabel(
+            L10n.format(
+                "reader.table_accessibility",
+                Int64(headers.count),
+                Int64(rows.count)
+            )
+        )
     }
 
     private func frontMatter(_ source: String) -> some View {
@@ -413,7 +442,7 @@ private struct MarkdownBlockView: View {
             .padding(16)
             .background(theme.frontMatterFill, in: RoundedRectangle(cornerRadius: 10))
             .padding(.bottom, bodySize * 0.78)
-            .accessibilityLabel("文档元数据：\(source)")
+            .accessibilityLabel(L10n.format("reader.metadata_accessibility", source))
     }
 
     @ViewBuilder
@@ -456,14 +485,16 @@ private struct MarkdownBlockView: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, bodySize * 0.5)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(alt.isEmpty ? "文档图片" : alt)
+        .accessibilityLabel(alt.isEmpty ? L10n.string("reader.document_image") : alt)
     }
 
     private func imagePlaceholder(alt: String) -> some View {
         ContentUnavailableView(
-            "无法载入图片",
+            "reader.image_error_title",
             systemImage: "photo.badge.exclamationmark",
-            description: Text(alt.isEmpty ? "请检查图片路径。" : alt)
+            description: Text(
+                alt.isEmpty ? L10n.string("reader.image_error_description") : alt
+            )
         )
         .frame(maxWidth: .infinity, minHeight: 160)
         .background(theme.codeFill, in: .rect(cornerRadius: 8))

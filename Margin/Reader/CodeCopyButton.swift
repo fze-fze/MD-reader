@@ -16,7 +16,7 @@ struct CodeCopyButton: View {
                     .contentTransition(.symbolEffect(.replace))
 
                 if isCopied {
-                    Text("已复制")
+                    Text("reader.copied")
                         .font(.caption)
                         .transition(successTextTransition)
                 }
@@ -31,8 +31,12 @@ struct CodeCopyButton: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(isCopied ? theme.accent : theme.textSecondary)
-        .accessibilityLabel(isCopied ? "复制成功" : "复制代码")
-        .accessibilityHint(isCopied ? "代码已复制到剪贴板" : "将代码复制到剪贴板")
+        .accessibilityLabel(
+            L10n.string(isCopied ? "reader.copy_success" : "reader.copy_code")
+        )
+        .accessibilityHint(
+            L10n.string(isCopied ? "reader.copy_success_hint" : "reader.copy_hint")
+        )
         .sensoryFeedback(.success, trigger: copyCount)
         .task(id: copyCount) {
             guard copyCount > 0 else { return }

@@ -53,7 +53,7 @@ struct DocumentWorkspaceView: View {
     }
 
     private var displayName: String {
-        fileURL?.deletingPathExtension().lastPathComponent ?? "未命名"
+        fileURL?.deletingPathExtension().lastPathComponent ?? L10n.string("workspace.untitled")
     }
 
     private var theme: MarkdownTheme {
@@ -126,13 +126,13 @@ struct DocumentWorkspaceView: View {
     private var workspaceToolbar: some ToolbarContent {
         ToolbarItemGroup(placement: .topBarTrailing) {
             if mode == .read {
-                Button("搜索", systemImage: "magnifyingglass") {
+                Button("workspace.search", systemImage: "magnifyingglass") {
                     isSearchPresented = true
                 }
                 workspaceMenu
-                Button("编辑", action: beginEditing)
+                Button("workspace.edit", action: beginEditing)
             } else {
-                Button("完成", action: finishEditing)
+                Button("common.done", action: finishEditing)
                     .buttonStyle(.glassProminent)
                     .tint(theme.accent)
             }
@@ -140,14 +140,14 @@ struct DocumentWorkspaceView: View {
     }
 
     private var workspaceMenu: some View {
-        Menu("更多", systemImage: "ellipsis") {
-            Button("目录", systemImage: "list.bullet.indent") {
+        Menu("workspace.more", systemImage: "ellipsis") {
+            Button("workspace.outline", systemImage: "list.bullet.indent") {
                 presentedSheet = .outline
             }
-            Button("阅读设置", systemImage: "textformat.size") {
+            Button("workspace.reader_settings", systemImage: "textformat.size") {
                 presentedSheet = .settings
             }
-            Button("文档信息", systemImage: "info.circle") {
+            Button("workspace.document_info", systemImage: "info.circle") {
                 presentedSheet = .info
             }
         }
@@ -216,7 +216,7 @@ private struct DocumentSearchModifier: ViewModifier {
                 text: $searchText,
                 isPresented: $isPresented,
                 placement: .navigationBarDrawer(displayMode: .automatic),
-                prompt: "在文档中查找"
+                prompt: "workspace.search_prompt"
             )
         } else {
             content

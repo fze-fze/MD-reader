@@ -37,21 +37,13 @@ struct MarkdownDocument: FileDocument {
         return FileWrapper(regularFileWithContents: data)
     }
 
-    static let starterDocument = """
-    # 欢迎使用 Margin
-
-    一处安静、原生的 Markdown 阅读与写作空间。
-
-    > 打开一个文档，或直接从这里开始。你的修改会由系统自动保存。
-
-    ## 你可以做什么
-
-    - 在阅读和编辑间自然切换
-    - 使用 **Markdown** 组织想法
-    - 在 iPhone、iPad 与“文件”App 之间原位打开文档
-
-    ```swift
-    let writing = "清晰，也可以很漂亮"
-    ```
-    """
+    static var starterDocument: String {
+        guard let url = Bundle.main.url(
+            forResource: "DefaultDocument",
+            withExtension: "md"
+        ), let contents = try? String(contentsOf: url, encoding: .utf8) else {
+            return "# Margin\n"
+        }
+        return contents
+    }
 }

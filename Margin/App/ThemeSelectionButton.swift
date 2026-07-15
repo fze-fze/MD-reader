@@ -6,9 +6,11 @@ struct ThemeSelectionButton: View {
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        Button("选取主题", action: ThemePickerPresenter.present)
+        Button("launch.select_theme", action: ThemePickerPresenter.present)
             .tint(MarkdownTheme(readerTheme: selectedTheme, colorScheme: colorScheme).accent)
-            .accessibilityHint("当前为\(selectedTheme.titleText)，打开主题选择页")
+            .accessibilityHint(
+                L10n.format("theme.picker.current_hint", selectedTheme.titleText)
+            )
     }
 }
 

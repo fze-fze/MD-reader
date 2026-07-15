@@ -153,6 +153,25 @@ struct MarkdownParserTests {
         #expect(!DocumentRenamer.isValidName("Folder/Notes"))
     }
 
+    @Test func includesSeparatedEnglishAndSimplifiedChineseResources() throws {
+        let appBundle = try #require(Bundle(identifier: "com.fze.margin"))
+        let english = try localizedBundle(language: "en", in: appBundle)
+        let chinese = try localizedBundle(language: "zh-Hans", in: appBundle)
+
+        #expect(appBundle.developmentLocalization == "en")
+        #expect(appBundle.localizations.contains("en"))
+        #expect(appBundle.localizations.contains("zh-Hans"))
+        #expect(english.localizedString(forKey: "workspace.search", value: nil, table: nil) == "Search")
+        #expect(chinese.localizedString(forKey: "workspace.search", value: nil, table: nil) == "搜索")
+        #expect(english.localizedString(forKey: "settings.title", value: nil, table: nil) == "Reading Settings")
+        #expect(chinese.localizedString(forKey: "settings.title", value: nil, table: nil) == "阅读设置")
+
+        let englishTemplate = try localizedTemplate(in: english)
+        let chineseTemplate = try localizedTemplate(in: chinese)
+        #expect(englishTemplate.hasPrefix("# Welcome to Margin"))
+        #expect(chineseTemplate.hasPrefix("# 欢迎使用 Margin"))
+    }
+
     @Test @MainActor func documentSessionKeepsItsIdentityAndSavesAfterRenaming() async throws {
         let folderURL = FileManager.default.temporaryDirectory
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)
@@ -259,6 +278,16 @@ struct MarkdownParserTests {
         )
         renderer.scale = 2
         return renderer.uiImage?.pngData()
+    }
+
+    private func localizedBundle(language: String, in appBundle: Bundle) throws -> Bundle {
+        let path = try #require(appBundle.path(forResource: language, ofType: "lproj"))
+        return try #require(Bundle(path: path))
+    }
+
+    private func localizedTemplate(in bundle: Bundle) throws -> String {
+        let url = try #require(bundle.url(forResource: "DefaultDocument", withExtension: "md"))
+        return try String(contentsOf: url, encoding: .utf8)
     }
 
     @Test func printRendererProducesStyledHTMLAndEscapesContent() {

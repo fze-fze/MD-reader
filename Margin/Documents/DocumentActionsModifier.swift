@@ -27,14 +27,16 @@ struct DocumentActionsModifier: ViewModifier {
                             .lineLimit(1)
                             .foregroundStyle(.primary)
                     }
-                    .accessibilityLabel("文稿操作：\(displayName)")
+                    .accessibilityLabel(
+                        L10n.format("document.actions.label", displayName)
+                    )
                 }
             }
             .fileExporter(
                 isPresented: $isCopyPresented,
                 document: MarkdownDocument(text: text),
                 contentTypes: [MarkdownDocument.markdownContentType],
-                defaultFilename: "\(displayName) 副本"
+                defaultFilename: L10n.format("document.copy_filename", displayName)
             ) { result in
                 if case let .failure(error) = result {
                     actionError = .copy(error)
@@ -55,19 +57,19 @@ struct DocumentActionsModifier: ViewModifier {
             } onCancellation: {
                 // The current document remains open at its original location.
             }
-            .alert("重新命名", isPresented: $isRenamePresented) {
-                TextField("文稿名称", text: $proposedName)
-                Button("取消", role: .cancel) {}
-                Button("重新命名", action: renameDocument)
+            .alert("document.rename", isPresented: $isRenamePresented) {
+                TextField("document.name_field", text: $proposedName)
+                Button("common.cancel", role: .cancel) {}
+                Button("document.rename", action: renameDocument)
                     .disabled(!DocumentRenamer.isValidName(proposedName))
             } message: {
-                Text("文件扩展名会保持不变。")
+                Text("document.extension_unchanged")
             }
             .alert(item: $actionError) { error in
                 Alert(
                     title: Text(error.title),
                     message: Text(error.message),
-                    dismissButton: .default(Text("好"))
+                    dismissButton: .default(Text("common.ok"))
                 )
             }
     }
@@ -75,22 +77,22 @@ struct DocumentActionsModifier: ViewModifier {
     @ViewBuilder
     private var titleMenu: some View {
         Section {
-            Button("复制", systemImage: "doc.on.doc") {
+            Button("document.copy", systemImage: "doc.on.doc") {
                 isCopyPresented = true
             }
 
             if fileURL != nil {
-                Button("移动", systemImage: "folder") {
+                Button("document.move", systemImage: "folder") {
                     isMovePresented = true
                 }
             }
 
-            Button("重新命名", systemImage: "pencil", action: presentRenameDialog)
+            Button("document.rename", systemImage: "pencil", action: presentRenameDialog)
                 .disabled(fileURL == nil || isRenaming)
         }
 
         Section {
-            Button("分享", systemImage: "square.and.arrow.up") {
+            Button("document.share", systemImage: "square.and.arrow.up") {
                 Task { @MainActor in
                     do {
                         try await DocumentSharePresenter.present(
@@ -105,7 +107,7 @@ struct DocumentActionsModifier: ViewModifier {
         }
 
         Section {
-            Button("打印", systemImage: "printer") {
+            Button("document.print", systemImage: "printer") {
                 DocumentPrinter.present(
                     text: text,
                     title: displayName,
@@ -159,17 +161,17 @@ private enum DocumentActionError: Identifiable {
 
     var title: String {
         switch self {
-        case .copy: "无法复制文稿"
-        case .move: "无法移动文稿"
-        case .rename: "无法重新命名"
-        case .share: "无法分享文稿"
+        case .copy: L10n.string("document.error.copy_title")
+        case .move: L10n.string("document.error.move_title")
+        case .rename: L10n.string("document.error.rename_title")
+        case .share: L10n.string("document.error.share_title")
         }
     }
 
     var message: String {
         switch self {
         case .copy, .move:
-            "请稍后重试，或在“文件”App 中完成此操作。"
+            L10n.string("document.error.files_retry")
         case let .rename(error):
             error.localizedDescription
         case let .share(error):

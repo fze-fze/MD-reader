@@ -36,11 +36,11 @@ struct MarkdownAccessoryBar: View {
     }
 
     private var formatMenu: some View {
-        Menu("格式", systemImage: "textformat") {
+        Menu("editor.format", systemImage: "textformat") {
             Button(MarkdownEditAction.body.label, systemImage: MarkdownEditAction.body.systemImage) {
                 onAction(.body)
             }
-            Section("标题") {
+            Section("editor.heading_section") {
                 Button(MarkdownEditAction.heading1.label, systemImage: MarkdownEditAction.heading1.systemImage) {
                     onAction(.heading1)
                 }
@@ -54,7 +54,7 @@ struct MarkdownAccessoryBar: View {
         }
         .labelStyle(.iconOnly)
         .frame(minWidth: 44, minHeight: 44)
-        .accessibilityHint("选择正文或标题层级")
+        .accessibilityHint(Text("editor.format_hint"))
     }
 
     private var barDivider: some View {

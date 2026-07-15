@@ -10,7 +10,7 @@ struct ThemeSelectionSheet: View {
             ThemePickerView(selectedTheme: $selectedTheme)
                 .toolbar {
                     ToolbarItem(placement: .confirmationAction) {
-                        Button("完成", action: onDone)
+                        Button("common.done", action: onDone)
                     }
                 }
         }

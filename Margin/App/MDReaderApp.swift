@@ -12,9 +12,9 @@ struct MDReaderApp: App {
             )
         }
 
-        DocumentGroupLaunchScene("Margin 文稿") {
+        DocumentGroupLaunchScene("launch.documents") {
             ThemeSelectionButton()
-            NewDocumentButton("开始书写", for: MarkdownDocument.self)
+            NewDocumentButton("launch.start_writing", for: MarkdownDocument.self)
         } background: {
             MarginLaunchBackground()
         }

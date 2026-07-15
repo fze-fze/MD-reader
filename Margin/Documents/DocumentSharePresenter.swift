@@ -65,6 +65,8 @@ enum DocumentSharePresenter {
         let components = name.components(separatedBy: invalidCharacters)
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
-        return components.isEmpty ? "未命名" : components.joined(separator: "-")
+        return components.isEmpty
+            ? L10n.string("document.share.untitled")
+            : components.joined(separator: "-")
     }
 }

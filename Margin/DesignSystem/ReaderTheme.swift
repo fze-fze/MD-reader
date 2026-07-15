@@ -15,8 +15,8 @@ enum ReaderTheme: String, CaseIterable, Identifiable {
 
     var subtitle: LocalizedStringKey {
         switch self {
-        case .claude: "Anthropic Serif 与温暖纸张配色"
-        case .github: "Typora 经典 GitHub 清爽排版"
+        case .claude: "theme.claude.subtitle"
+        case .github: "theme.github.subtitle"
         }
     }
 

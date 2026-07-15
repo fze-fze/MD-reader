@@ -6,7 +6,7 @@ enum DocumentShareError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .noActiveWindow:
-            "找不到可用于显示分享面板的窗口。"
+            L10n.string("document.error.no_share_window")
         }
     }
 }

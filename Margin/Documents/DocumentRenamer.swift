@@ -9,7 +9,7 @@ enum DocumentRenamer {
     nonisolated static func rename(fileAt sourceURL: URL, to proposedName: String) throws -> URL {
         let trimmedName = proposedName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard isValidName(trimmedName) else {
-            throw renameError("请输入有效的文稿名称，名称不能包含“/”。")
+            throw renameError(L10n.string("document.error.invalid_name"))
         }
 
         let pathExtension = sourceURL.pathExtension
@@ -23,7 +23,9 @@ enum DocumentRenamer {
             return sourceURL
         }
         guard !FileManager.default.fileExists(atPath: destinationURL.path()) else {
-            throw renameError("同一文件夹中已经存在名为“\(destinationURL.lastPathComponent)”的文稿。")
+            throw renameError(
+                L10n.format("document.error.name_exists", destinationURL.lastPathComponent)
+            )
         }
 
         let didAccessSecurityScopedResource = sourceURL.startAccessingSecurityScopedResource()

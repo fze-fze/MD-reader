@@ -23,18 +23,18 @@ struct ReaderSettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("主题") {
+                Section("settings.section.theme") {
                     NavigationLink {
                         ThemePickerView(selectedTheme: $readerTheme)
                     } label: {
-                        LabeledContent("文稿主题") {
+                        LabeledContent("settings.document_theme") {
                             Text(readerTheme.title)
                         }
                     }
                 }
 
-                Section("外观") {
-                    Picker("显示模式", selection: $appearance) {
+                Section("settings.section.appearance") {
+                    Picker("settings.display_mode", selection: $appearance) {
                         ForEach(ReaderAppearance.allCases) { item in
                             Text(item.title).tag(item)
                         }
@@ -42,8 +42,8 @@ struct ReaderSettingsView: View {
                     .pickerStyle(.segmented)
                 }
 
-                Section("排版") {
-                    LabeledContent("正文大小") {
+                Section("settings.section.typography") {
+                    LabeledContent("settings.body_size") {
                         HStack {
                             Image(systemName: "textformat.size.smaller")
                                 .accessibilityHidden(true)
@@ -58,7 +58,7 @@ struct ReaderSettingsView: View {
                                 .accessibilityHidden(true)
                         }
                     }
-                    Button("恢复默认排版") {
+                    Button("settings.reset_typography") {
                         draftTextScale = 1
                         commitTextScale()
                     }
@@ -66,11 +66,11 @@ struct ReaderSettingsView: View {
                 }
             }
             .tint(theme.accent)
-            .navigationTitle("阅读设置")
+            .navigationTitle("settings.title")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("完成") { dismiss() }
+                    Button("common.done") { dismiss() }
                 }
             }
         }

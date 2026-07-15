@@ -9,9 +9,9 @@ enum ReaderAppearance: String, CaseIterable, Identifiable {
 
     var title: LocalizedStringKey {
         switch self {
-        case .system: "跟随系统"
-        case .light: "浅色"
-        case .dark: "深色"
+        case .system: "appearance.system"
+        case .light: "appearance.light"
+        case .dark: "appearance.dark"
         }
     }
 
@@ -32,8 +32,8 @@ enum WorkspaceMode: String, CaseIterable, Identifiable {
 
     var title: LocalizedStringKey {
         switch self {
-        case .read: "阅读"
-        case .edit: "编辑"
+        case .read: "workspace.mode.read"
+        case .edit: "workspace.mode.edit"
         }
     }
 
