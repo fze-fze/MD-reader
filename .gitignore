@@ -1,0 +1,13 @@
+.DS_Store
+DerivedData/
+*.xcuserstate
+xcuserdata/
+*.xccheckout
+*.xcscmblueprint
+
+# Local assistant and generated QA artifacts
+.agents/
+.claude/
+CLAUDE.md
+output/
+screenshot-home-analysis.md

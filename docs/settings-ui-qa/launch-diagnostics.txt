@@ -1,0 +1,71 @@
+Margin 启动黑屏定向诊断摘录
+时间：2026-07-13 23:18–23:22 (Asia/Singapore)
+
+1. 受影响运行目标
+
+- XcodeBuildMCP 23:14 build/run 使用 iOS 26.2 iPhone 17 Pro：
+  `1C5D090C-BBFE-4CF3-9D93-3598CA492AAE`
+- CoreSimulator.log 记录：
+  `Jul 13 23:14:31 ... Requesting launch of com.fze.margin`
+- app stdout：
+  `com.fze.margin: 54067`
+- app 专属 oslog 没有异常或崩溃；捕获进程在 26.2 simulator 于 23:15:50 被关机后结束：
+  `Child process terminated with signal 9: Killed`
+
+2. 当前构建包的 scene 配置
+
+构建产物 `Margin.app/Info.plist`：
+
+  UIApplicationSceneManifest
+    UISceneConfigurationName = Document Browser
+    UISceneDelegateClassName = Margin.AppSceneDelegate
+
+二进制字符串同时包含：
+
+  _TtC6Margin16AppSceneDelegate
+  _TtC6Margin29DocumentBrowserViewController
+  _TtC6Margin11MDReaderApp
+
+3. 源码启动链
+
+- `MDReaderApp.application(_:configurationForConnecting:options:)`
+  返回名为 `Document Browser` 的 `UISceneConfiguration`，并设置
+  `delegateClass = AppSceneDelegate.self`。
+- `AppSceneDelegate.scene(_:willConnectTo:options:)`
+  创建 `UIWindow(windowScene:)`，以 `DocumentBrowserViewController` 为根控制器，
+  再调用 `makeKeyAndVisible()`。
+- 源码、构建产物 Info.plist 与二进制符号三者一致。
+
+4. 受影响 simulator 的持久 scene 状态
+
+容器：
+`~/Library/Developer/CoreSimulator/Devices/1C5D090C-BBFE-4CF3-9D93-3598CA492AAE/data/Containers/Data/Application/7047EF55-A369-48CC-A66D-806029333E3B`
+
+`Library/Saved Application State/com.fze.margin.savedState/KnownSceneSessions/data.data`
+仍包含：
+
+  SwiftUI.AppSceneDelegate
+  UISceneConfiguration
+  UIWindowSceneSessionRoleApplication
+
+同一 saved-state session 的 `userInfo.data` 仍包含旧 SwiftUI DocumentGroup scene ID：
+
+  com.apple.SwiftUI.sceneID
+  DocumentGroup-editor(Margin.DocumentWorkspaceView)-readable(
+    net.daringfireball.markdownpublic.plain-text
+  )-writable(net.daringfireball.markdownpublic.plain-text)
+
+该 saved state 的时间为 21:39，早于 23:03–23:10 的 UIKit
+`UIDocumentBrowserViewController` 启动架构切换。
+
+5. 对照观察
+
+- 黑屏证据：`docs/settings-ui-qa/launch-black-screen.jpg`，23:14，只有状态栏。
+- 另一台仍运行旧安装的 iOS 26.4 simulator 当前可显示 Document Browser；
+  这不能验证新入口，但说明 UIDocumentBrowser 与文档类型本身并非普遍不可用。
+
+6. 排除项
+
+- 未发现 scene delegate 类名未展开、类未链接、Info.plist scene 名不一致。
+- 未发现 app crash、fatal exception 或 `DocumentBrowserViewController.init` 异常。
+- 未修改源码、模拟器容器或 saved state。
