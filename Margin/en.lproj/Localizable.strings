@@ -98,6 +98,7 @@
 "outline.title" = "Outline";
 "reader.no_matches" = "No Matches";
 "reader.match_position" = "%lld / %lld";
+"reader.match_count" = "%lld matches";
 "reader.previous_match" = "Previous Match";
 "reader.next_match" = "Next Match";
 "reader.quote_accessibility" = "Quote: %@";

@@ -2,6 +2,14 @@ import SwiftUI
 import UIKit
 
 enum MarkdownTypography {
+    private struct InlineFontCacheKey: Hashable {
+        let theme: ReaderTheme
+        let size: Double
+        let weight: Double
+    }
+
+    private static var inlineFontCache: [InlineFontCacheKey: InlineMarkdownFonts] = [:]
+
     static func documentFont(
         theme: ReaderTheme,
         size: Double,
@@ -29,10 +37,19 @@ enum MarkdownTypography {
         size: Double,
         weight: UIFont.Weight = .regular
     ) -> InlineMarkdownFonts {
+        let cacheKey = InlineFontCacheKey(
+            theme: theme,
+            size: size,
+            weight: weight.rawValue
+        )
+        if let cachedFonts = inlineFontCache[cacheKey] {
+            return cachedFonts
+        }
+
         let strongWeight = weight.rawValue >= UIFont.Weight.bold.rawValue
             ? weight
             : .bold
-        return InlineMarkdownFonts(
+        let fonts = InlineMarkdownFonts(
             regular: documentFont(theme: theme, size: size, weight: weight),
             emphasized: Font(inlineItalicUIFont(
                 theme: theme,
@@ -50,6 +67,8 @@ enum MarkdownTypography {
                 weight: strongWeight
             ))
         )
+        inlineFontCache[cacheKey] = fonts
+        return fonts
     }
 
     static func inlineStrongUIFont(

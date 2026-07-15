@@ -1,6 +1,6 @@
 import SwiftUI
 
-enum ReaderTheme: String, CaseIterable, Identifiable {
+enum ReaderTheme: String, CaseIterable, Hashable, Identifiable {
     case claude
     case github
 

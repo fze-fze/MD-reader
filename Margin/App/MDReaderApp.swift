@@ -6,9 +6,9 @@ struct MDReaderApp: App {
 
     var body: some Scene {
         DocumentGroup(newDocument: MarkdownDocument()) { file in
-            DocumentSessionHost(
-                bootstrapText: file.$document.text,
-                sourceURL: file.fileURL
+            DocumentWorkspaceView(
+                text: file.$document.text,
+                fileURL: file.fileURL
             )
         }
 

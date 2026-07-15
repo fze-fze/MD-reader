@@ -98,6 +98,7 @@
 "outline.title" = "目录";
 "reader.no_matches" = "没有匹配项";
 "reader.match_position" = "%lld / %lld";
+"reader.match_count" = "%lld 个匹配项";
 "reader.previous_match" = "上一个匹配项";
 "reader.next_match" = "下一个匹配项";
 "reader.quote_accessibility" = "引用：%@";

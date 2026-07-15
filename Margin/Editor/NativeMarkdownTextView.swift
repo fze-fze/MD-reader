@@ -31,22 +31,44 @@ struct NativeMarkdownTextView: UIViewRepresentable {
         view.accessibilityLabel = L10n.string("editor.accessibility_label")
         view.text = text
         applyTypography(to: view)
+        context.coordinator.recordTypography(
+            readerTheme: readerTheme,
+            bodySize: bodySize,
+            textColor: UIColor(theme.textPrimary)
+        )
         return view
     }
 
     func updateUIView(_ view: UITextView, context: Context) {
         context.coordinator.parent = self
-        if view.text != text {
+        let hasMarkedText = view.markedTextRange != nil
+        var replacedText = false
+        if !hasMarkedText, view.text != text {
             view.text = text
+            replacedText = true
         }
-        if view.selectedRange != selectedRange, selectedRange.location <= (view.text as NSString).length {
+        if !hasMarkedText,
+           view.selectedRange != selectedRange,
+           selectedRange.location <= (view.text as NSString).length {
             view.selectedRange = selectedRange
         }
         view.backgroundColor = UIColor(theme.canvas)
         view.textColor = UIColor(theme.textPrimary)
         view.tintColor = UIColor(theme.accent)
-        view.font = documentFont
-        applyTypography(to: view)
+        let typographyChanged = context.coordinator.typographyChanged(
+            readerTheme: readerTheme,
+            bodySize: bodySize,
+            textColor: UIColor(theme.textPrimary)
+        )
+        if !hasMarkedText, replacedText || typographyChanged {
+            view.font = documentFont
+            applyTypography(to: view)
+            context.coordinator.recordTypography(
+                readerTheme: readerTheme,
+                bodySize: bodySize,
+                textColor: UIColor(theme.textPrimary)
+            )
+        }
 
         if isFocused != view.isFirstResponder {
             Task { @MainActor in
@@ -84,17 +106,23 @@ struct NativeMarkdownTextView: UIViewRepresentable {
     @MainActor
     final class Coordinator: NSObject, UITextViewDelegate {
         var parent: NativeMarkdownTextView
+        private var lastReaderTheme: ReaderTheme?
+        private var lastBodySize: Double?
+        private var lastTextColor: UIColor?
 
         init(parent: NativeMarkdownTextView) {
             self.parent = parent
         }
 
         func textViewDidChange(_ textView: UITextView) {
-            parent.text = textView.text
-            parent.selectedRange = textView.selectedRange
+            synchronizeCommittedText(from: textView)
         }
 
         func textViewDidChangeSelection(_ textView: UITextView) {
+            guard textView.markedTextRange == nil else { return }
+            if parent.text != textView.text {
+                parent.text = textView.text
+            }
             parent.selectedRange = textView.selectedRange
         }
 
@@ -103,7 +131,34 @@ struct NativeMarkdownTextView: UIViewRepresentable {
         }
 
         func textViewDidEndEditing(_ textView: UITextView) {
+            synchronizeCommittedText(from: textView)
             parent.isFocused = false
+        }
+
+        func typographyChanged(
+            readerTheme: ReaderTheme,
+            bodySize: Double,
+            textColor: UIColor
+        ) -> Bool {
+            lastReaderTheme != readerTheme
+                || lastBodySize != bodySize
+                || lastTextColor?.isEqual(textColor) != true
+        }
+
+        func recordTypography(
+            readerTheme: ReaderTheme,
+            bodySize: Double,
+            textColor: UIColor
+        ) {
+            lastReaderTheme = readerTheme
+            lastBodySize = bodySize
+            lastTextColor = textColor
+        }
+
+        private func synchronizeCommittedText(from textView: UITextView) {
+            guard textView.markedTextRange == nil else { return }
+            parent.text = textView.text
+            parent.selectedRange = textView.selectedRange
         }
     }
 }

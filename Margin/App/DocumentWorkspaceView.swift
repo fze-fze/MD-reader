@@ -1,16 +1,15 @@
 import SwiftUI
 
 struct DocumentWorkspaceView: View {
-    private let session: DocumentSession?
-    @Binding private var bootstrapText: String
-    private let bootstrapFileURL: URL?
+    @Binding private var text: String
+    private let fileURL: URL?
 
     @AppStorage("readerAppearance") private var appearance = ReaderAppearance.system
     @AppStorage("readerTextScale") private var textScale = 1.0
     @AppStorage("readerTheme") private var readerTheme = ReaderTheme.claude
     @State private var mode: WorkspaceMode = .read
     @State private var presentedSheet: WorkspaceSheet?
-    @State private var searchText = ""
+    @State private var searchSession = DocumentSearchSession()
     @State private var isSearchPresented = false
     @State private var scrollTarget: Int?
     @State private var isEditorFocused = false
@@ -18,34 +17,9 @@ struct DocumentWorkspaceView: View {
     @Environment(\.colorScheme) private var systemColorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    init(session: DocumentSession) {
-        self.session = session
-        _bootstrapText = .constant("")
-        bootstrapFileURL = nil
-    }
-
     init(text: Binding<String>, fileURL: URL?) {
-        session = nil
-        _bootstrapText = text
-        bootstrapFileURL = fileURL
-    }
-
-    private var text: String {
-        session?.text ?? bootstrapText
-    }
-
-    private var textBinding: Binding<String> {
-        if let session {
-            return Binding(
-                get: { session.text },
-                set: { session.text = $0 }
-            )
-        }
-        return $bootstrapText
-    }
-
-    private var fileURL: URL? {
-        session?.fileURL ?? bootstrapFileURL
+        _text = text
+        self.fileURL = fileURL
     }
 
     private var resolvedColorScheme: ColorScheme {
@@ -68,7 +42,7 @@ struct DocumentWorkspaceView: View {
             if mode == .read {
                 MarkdownReaderView(
                     source: text,
-                    searchText: searchText,
+                    searchSession: searchSession,
                     scrollTarget: $scrollTarget,
                     textScale: textScale,
                     baseURL: fileURL?.deletingLastPathComponent(),
@@ -78,7 +52,7 @@ struct DocumentWorkspaceView: View {
                 .transition(.opacity)
             } else {
                 MarkdownEditorView(
-                    text: textBinding,
+                    text: $text,
                     textScale: textScale,
                     isFocused: $isEditorFocused,
                     readerTheme: readerTheme
@@ -89,25 +63,27 @@ struct DocumentWorkspaceView: View {
         .environment(\.colorScheme, resolvedColorScheme)
         .navigationTitle(displayName)
         .navigationBarTitleDisplayMode(.inline)
-        .modifier(
-            DocumentSearchModifier(
-                searchText: $searchText,
-                isPresented: $isSearchPresented
-            )
-        )
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if mode == .read, isSearchPresented {
+                DocumentSearchBar(
+                    session: searchSession,
+                    theme: theme,
+                    onDismiss: dismissSearch
+                )
+                .transition(
+                    reduceMotion
+                        ? .opacity
+                        : .move(edge: .bottom).combined(with: .opacity)
+                )
+            }
+        }
         .modifier(
             DocumentActionsModifier(
                 text: text,
                 fileURL: fileURL,
-                displayName: displayName,
-                session: session
+                displayName: displayName
             )
         )
-        .onChange(of: isSearchPresented) { _, isPresented in
-            if !isPresented {
-                searchText = ""
-            }
-        }
         .onAppear {
             if QuickActionDocumentCreator.consumeEditorRequest(for: fileURL) {
                 beginEditing()
@@ -118,6 +94,10 @@ struct DocumentWorkspaceView: View {
             sheetView(sheet)
         }
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: mode)
+        .animation(
+            reduceMotion ? nil : .easeInOut(duration: 0.16),
+            value: isSearchPresented
+        )
         .sensoryFeedback(.selection, trigger: mode)
         .preferredColorScheme(appearance.colorScheme)
     }
@@ -126,9 +106,8 @@ struct DocumentWorkspaceView: View {
     private var workspaceToolbar: some ToolbarContent {
         ToolbarItemGroup(placement: .topBarTrailing) {
             if mode == .read {
-                Button("workspace.search", systemImage: "magnifyingglass") {
-                    isSearchPresented = true
-                }
+                Button("workspace.search", systemImage: "magnifyingglass", action: presentSearch)
+                    .keyboardShortcut("f", modifiers: .command)
                 workspaceMenu
                 Button("workspace.edit", action: beginEditing)
             } else {
@@ -154,7 +133,7 @@ struct DocumentWorkspaceView: View {
     }
 
     private func beginEditing() {
-        isSearchPresented = false
+        dismissSearch()
         mode = .edit
         Task { @MainActor in
             await Task.yield()
@@ -167,8 +146,18 @@ struct DocumentWorkspaceView: View {
         mode = .read
     }
 
+    private func presentSearch() {
+        searchSession.activate()
+        isSearchPresented = true
+    }
+
+    private func dismissSearch() {
+        isSearchPresented = false
+        searchSession.deactivate()
+    }
+
     private func toggleTask(atLine lineNumber: Int) {
-        textBinding.wrappedValue = MarkdownTaskToggler.toggledSource(
+        text = MarkdownTaskToggler.toggledSource(
             text,
             taskAtLine: lineNumber
         )
@@ -203,23 +192,4 @@ struct DocumentWorkspaceView: View {
 private enum WorkspaceSheet: String, Identifiable {
     case outline, settings, info
     var id: Self { self }
-}
-
-private struct DocumentSearchModifier: ViewModifier {
-    @Binding var searchText: String
-    @Binding var isPresented: Bool
-
-    @ViewBuilder
-    func body(content: Content) -> some View {
-        if isPresented {
-            content.searchable(
-                text: $searchText,
-                isPresented: $isPresented,
-                placement: .navigationBarDrawer(displayMode: .automatic),
-                prompt: "workspace.search_prompt"
-            )
-        } else {
-            content
-        }
-    }
 }

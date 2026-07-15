@@ -81,6 +81,51 @@ struct MarkdownParserTests {
         #expect(index.matches(for: "**").isEmpty)
     }
 
+    @Test @MainActor func documentSearchWaitsForExplicitNavigationBeforeMoving() async {
+        let blocks = MarkdownParser.parse("# Alpha\n\nAlpha beta alpha")
+        let session = DocumentSearchSession()
+        session.replaceIndex(DocumentSearchIndex(blocks: blocks))
+        session.activate()
+        session.query = "alpha"
+
+        await session.performSearch()
+
+        #expect(session.matches.count == 3)
+        #expect(session.activeMatch == nil)
+        #expect(session.matchedBlockIDs == [0, 2])
+
+        session.moveToNext()
+        #expect(session.activeMatch == .init(blockID: 0, occurrenceIndex: 0))
+
+        session.moveToPrevious()
+        #expect(session.activeMatch == .init(blockID: 2, occurrenceIndex: 1))
+
+        session.deactivate()
+        #expect(session.query == "alpha")
+        #expect(session.matches.isEmpty)
+
+        session.clear()
+        #expect(session.matches.isEmpty)
+        #expect(session.effectiveQuery.isEmpty)
+    }
+
+    @Test @MainActor func closingSearchDiscardsAnInFlightQuery() async {
+        let blocks = MarkdownParser.parse("Alpha beta alpha")
+        let session = DocumentSearchSession()
+        session.replaceIndex(DocumentSearchIndex(blocks: blocks))
+        session.activate()
+        session.query = "alpha"
+
+        let search = Task { await session.performSearch() }
+        await Task.yield()
+        session.deactivate()
+        await search.value
+
+        #expect(session.matches.isEmpty)
+        #expect(session.effectiveQuery.isEmpty)
+        #expect(!session.isActive)
+    }
+
     @Test func claudeThemeUsesAnthropicSerifWithBundledCJKSerifFallback() {
         let font = MarkdownTypography.documentUIFont(theme: .claude, size: 16)
         let cascade = font.fontDescriptor.object(forKey: .cascadeList)
@@ -170,34 +215,6 @@ struct MarkdownParserTests {
         let chineseTemplate = try localizedTemplate(in: chinese)
         #expect(englishTemplate.hasPrefix("# Welcome to Margin"))
         #expect(chineseTemplate.hasPrefix("# 欢迎使用 Margin"))
-    }
-
-    @Test @MainActor func documentSessionKeepsItsIdentityAndSavesAfterRenaming() async throws {
-        let folderURL = FileManager.default.temporaryDirectory
-            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
-        try FileManager.default.createDirectory(at: folderURL, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: folderURL) }
-
-        let sourceURL = folderURL.appending(path: "Before.md")
-        try "# Before".write(to: sourceURL, atomically: true, encoding: .utf8)
-
-        let store = DocumentSessionStore()
-        let session = store.session(for: sourceURL, bootstrapText: "# Before")
-        let originalID = session.id
-        await session.openIfNeeded()
-        session.text = "# Edited before rename"
-
-        try await session.rename(to: "After")
-        session.text = "# Edited after rename"
-
-        try await session.rename(to: "Final")
-
-        #expect(session.id == originalID)
-        #expect(session.fileURL.lastPathComponent == "Final.md")
-        #expect(store.session(for: sourceURL, bootstrapText: "stale") === session)
-        #expect(!FileManager.default.fileExists(atPath: sourceURL.path()))
-        #expect(try String(contentsOf: session.fileURL, encoding: .utf8) ==
-            "# Edited after rename")
     }
 
     @Test @MainActor func rendersStrongEmphasisAndCombinedEmphasisWithConcreteFonts() {

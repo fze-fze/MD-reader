@@ -31,6 +31,6 @@ App 图标源文件为 `Margin/AppIcon.icon`；旧版扁平图标保存在 `docs
 
 ## iCloud Drive
 
-Margin 基于 SwiftUI `DocumentGroup`，因此启动时会显示系统文稿首页，并直接接入“文件”App 的 iCloud Drive、本机与第三方文件提供商。文档在原位置打开和保存，iCloud 同步由系统负责，不需要应用自建云端副本。
+Margin 基于 SwiftUI `DocumentGroup`，并以它提供的 `FileDocument` 作为唯一文档数据源，因此启动时会显示系统文稿首页，并直接接入“文件”App 的 iCloud Drive、本机与第三方文件提供商。文档在原位置打开和保存，iCloud 同步、外部修改协调与自动保存均由系统负责，不需要应用自建云端副本或第二套文档会话。
 
 若要让正式发行版在 iCloud Drive 中拥有专属的 Margin 文件夹，需要在 Xcode 的 Signing & Capabilities 中选择实际 Apple Developer Team，并为最终 Bundle ID 启用 iCloud Documents container。仓库不会提交无法签名的占位容器。

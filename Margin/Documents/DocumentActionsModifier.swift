@@ -4,7 +4,6 @@ struct DocumentActionsModifier: ViewModifier {
     let text: String
     let fileURL: URL?
     let displayName: String
-    let session: DocumentSession?
 
     @State private var isCopyPresented = false
     @State private var isMovePresented = false
@@ -17,20 +16,8 @@ struct DocumentActionsModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    Menu {
-                        titleMenu
-                    } label: {
-                        Text(displayName)
-                            .font(.headline)
-                            .lineLimit(1)
-                            .foregroundStyle(.primary)
-                    }
-                    .accessibilityLabel(
-                        L10n.format("document.actions.label", displayName)
-                    )
-                }
+            .toolbarTitleMenu {
+                titleMenu
             }
             .fileExporter(
                 isPresented: $isCopyPresented,
@@ -128,13 +115,9 @@ struct DocumentActionsModifier: ViewModifier {
         isRenaming = true
         Task {
             do {
-                if let session {
-                    try await session.rename(to: requestedName)
-                } else {
-                    _ = try await Task.detached(priority: .userInitiated) {
-                        try DocumentRenamer.rename(fileAt: fileURL, to: requestedName)
-                    }.value
-                }
+                _ = try await Task.detached(priority: .userInitiated) {
+                    try DocumentRenamer.rename(fileAt: fileURL, to: requestedName)
+                }.value
                 isRenaming = false
             } catch {
                 isRenaming = false

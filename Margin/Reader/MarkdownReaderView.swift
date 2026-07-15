@@ -2,7 +2,7 @@ import SwiftUI
 
 struct MarkdownReaderView: View {
     let source: String
-    let searchText: String
+    let searchSession: DocumentSearchSession
     @Binding var scrollTarget: Int?
     let textScale: Double
     let baseURL: URL?
@@ -12,36 +12,27 @@ struct MarkdownReaderView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @ScaledMetric(relativeTo: .body) private var bodySize = 16.0
-    @State private var currentMatchIndex = 0
     @State private var blocks: [MarkdownBlock] = []
-    @State private var searchIndex = DocumentSearchIndex()
-    @State private var searchMatches: [DocumentSearchIndex.Match] = []
-    @State private var contentRevision = 0
 
     private var theme: MarkdownTheme {
         MarkdownTheme(readerTheme: readerTheme, colorScheme: colorScheme)
     }
-    private var searchRequest: SearchRequest {
-        SearchRequest(contentRevision: contentRevision, query: searchText)
-    }
-    private var activeMatch: DocumentSearchIndex.Match? {
-        guard searchMatches.indices.contains(currentMatchIndex) else { return nil }
-        return searchMatches[currentMatchIndex]
-    }
-
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
                     ForEach(blocks) { block in
+                        let blockSearchText = searchSession.matchedBlockIDs.contains(block.id)
+                            ? searchSession.effectiveQuery
+                            : ""
                         MarkdownBlockView(
                             block: block,
                             bodySize: bodySize * textScale,
                             theme: theme,
                             baseURL: baseURL,
-                            searchText: searchText,
-                            activeOccurrenceIndex: activeMatch?.blockID == block.id
-                                ? activeMatch?.occurrenceIndex
+                            searchText: blockSearchText,
+                            activeOccurrenceIndex: searchSession.activeMatch?.blockID == block.id
+                                ? searchSession.activeMatch?.occurrenceIndex
                                 : nil,
                             onToggleTask: onToggleTask
                         )
@@ -64,29 +55,7 @@ struct MarkdownReaderView: View {
                 }.value
                 guard !Task.isCancelled else { return }
                 blocks = result.0
-                searchIndex = result.1
-                contentRevision &+= 1
-            }
-            .task(id: searchRequest) {
-                let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !query.isEmpty else {
-                    searchMatches = []
-                    currentMatchIndex = 0
-                    return
-                }
-
-                try? await Task.sleep(for: .milliseconds(150))
-                guard !Task.isCancelled else { return }
-
-                let indexSnapshot = searchIndex
-                let matches = await Task.detached(priority: .userInitiated) {
-                    indexSnapshot.matches(for: query)
-                }.value
-                guard !Task.isCancelled else { return }
-
-                searchMatches = matches
-                currentMatchIndex = 0
-                scrollToCurrentMatch(using: proxy)
+                searchSession.replaceIndex(result.1)
             }
             .onChange(of: scrollTarget) { _, target in
                 guard let target else { return }
@@ -95,74 +64,18 @@ struct MarkdownReaderView: View {
                 }
                 scrollTarget = nil
             }
-            .overlay(alignment: .bottom) {
-                if !searchText.isEmpty {
-                    SearchMatchBadge(
-                        count: searchMatches.count,
-                        current: searchMatches.isEmpty ? 0 : currentMatchIndex + 1,
-                        onPrevious: {
-                            guard !searchMatches.isEmpty else { return }
-                            currentMatchIndex = (currentMatchIndex - 1 + searchMatches.count) % searchMatches.count
-                            scrollToCurrentMatch(using: proxy)
-                        },
-                        onNext: {
-                            guard !searchMatches.isEmpty else { return }
-                            currentMatchIndex = (currentMatchIndex + 1) % searchMatches.count
-                            scrollToCurrentMatch(using: proxy)
-                        }
-                    )
-                        .padding(.bottom, 12)
-                }
+            .onChange(of: searchSession.navigationRevision) {
+                scrollToCurrentMatch(using: proxy)
             }
         }
     }
 
     private func scrollToCurrentMatch(using proxy: ScrollViewProxy) {
-        guard searchMatches.indices.contains(currentMatchIndex) else { return }
+        guard let activeMatch = searchSession.activeMatch else { return }
         withAnimation(.snappy) {
-            proxy.scrollTo(searchMatches[currentMatchIndex].blockID, anchor: .center)
+            proxy.scrollTo(activeMatch.blockID, anchor: .center)
         }
     }
-}
-
-private struct SearchRequest: Equatable {
-    let contentRevision: Int
-    let query: String
-}
-
-private struct SearchMatchBadge: View {
-    let count: Int
-    let current: Int
-    let onPrevious: () -> Void
-    let onNext: () -> Void
-
-    var body: some View {
-        HStack(spacing: 2) {
-            Text(
-                count == 0
-                    ? L10n.string("reader.no_matches")
-                    : L10n.format(
-                        "reader.match_position",
-                        Int64(current),
-                        Int64(count)
-                    )
-            )
-                .font(.footnote.monospacedDigit())
-                .padding(.horizontal, 8)
-            Button("reader.previous_match", systemImage: "chevron.up", action: onPrevious)
-                .labelStyle(.iconOnly)
-                .frame(minWidth: 44, minHeight: 44)
-                .disabled(count == 0)
-            Button("reader.next_match", systemImage: "chevron.down", action: onNext)
-                .labelStyle(.iconOnly)
-                .frame(minWidth: 44, minHeight: 44)
-                .disabled(count == 0)
-        }
-        .padding(.horizontal, 12)
-        .glassEffect(.regular.interactive(), in: .capsule)
-        .accessibilityAddTraits(.updatesFrequently)
-    }
-
 }
 
 private struct MarkdownBlockView: View {
