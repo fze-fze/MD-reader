@@ -1,8 +1,9 @@
 import SwiftUI
 
 struct DocumentWorkspaceView: View {
-    @Binding var text: String
-    let fileURL: URL?
+    private let session: DocumentSession?
+    @Binding private var bootstrapText: String
+    private let bootstrapFileURL: URL?
 
     @AppStorage("readerAppearance") private var appearance = ReaderAppearance.system
     @AppStorage("readerTextScale") private var textScale = 1.0
@@ -16,6 +17,36 @@ struct DocumentWorkspaceView: View {
 
     @Environment(\.colorScheme) private var systemColorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    init(session: DocumentSession) {
+        self.session = session
+        _bootstrapText = .constant("")
+        bootstrapFileURL = nil
+    }
+
+    init(text: Binding<String>, fileURL: URL?) {
+        session = nil
+        _bootstrapText = text
+        bootstrapFileURL = fileURL
+    }
+
+    private var text: String {
+        session?.text ?? bootstrapText
+    }
+
+    private var textBinding: Binding<String> {
+        if let session {
+            return Binding(
+                get: { session.text },
+                set: { session.text = $0 }
+            )
+        }
+        return $bootstrapText
+    }
+
+    private var fileURL: URL? {
+        session?.fileURL ?? bootstrapFileURL
+    }
 
     private var resolvedColorScheme: ColorScheme {
         appearance.colorScheme ?? systemColorScheme
@@ -47,7 +78,7 @@ struct DocumentWorkspaceView: View {
                 .transition(.opacity)
             } else {
                 MarkdownEditorView(
-                    text: $text,
+                    text: textBinding,
                     textScale: textScale,
                     isFocused: $isEditorFocused,
                     readerTheme: readerTheme
@@ -68,7 +99,8 @@ struct DocumentWorkspaceView: View {
             DocumentActionsModifier(
                 text: text,
                 fileURL: fileURL,
-                displayName: displayName
+                displayName: displayName,
+                session: session
             )
         )
         .onChange(of: isSearchPresented) { _, isPresented in
@@ -136,7 +168,10 @@ struct DocumentWorkspaceView: View {
     }
 
     private func toggleTask(atLine lineNumber: Int) {
-        text = MarkdownTaskToggler.toggledSource(text, taskAtLine: lineNumber)
+        textBinding.wrappedValue = MarkdownTaskToggler.toggledSource(
+            text,
+            taskAtLine: lineNumber
+        )
     }
 
     @ViewBuilder

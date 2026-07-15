@@ -24,6 +24,71 @@ enum MarkdownTypography {
         }
     }
 
+    static func inlineFonts(
+        theme: ReaderTheme,
+        size: Double,
+        weight: UIFont.Weight = .regular
+    ) -> InlineMarkdownFonts {
+        let strongWeight = weight.rawValue >= UIFont.Weight.bold.rawValue
+            ? weight
+            : .bold
+        return InlineMarkdownFonts(
+            regular: documentFont(theme: theme, size: size, weight: weight),
+            emphasized: Font(inlineItalicUIFont(
+                theme: theme,
+                size: size,
+                weight: weight
+            )),
+            strong: Font(inlineStrongUIFont(
+                theme: theme,
+                size: size,
+                weight: strongWeight
+            )),
+            strongEmphasis: Font(inlineItalicUIFont(
+                theme: theme,
+                size: size,
+                weight: strongWeight
+            ))
+        )
+    }
+
+    static func inlineStrongUIFont(
+        theme: ReaderTheme,
+        size: Double,
+        weight: UIFont.Weight
+    ) -> UIFont {
+        let pointSize = CGFloat(size)
+        let systemFont = UIFont.systemFont(ofSize: pointSize, weight: weight)
+        var descriptor = systemFont.fontDescriptor
+        if theme == .claude {
+            descriptor = descriptor.withDesign(.serif) ?? descriptor
+            descriptor = descriptor.addingAttributes([
+                .cascadeList: [cjkSerifDescriptor(size: pointSize, weight: weight)]
+            ])
+        }
+        return UIFont(descriptor: descriptor, size: pointSize)
+    }
+
+    static func inlineItalicUIFont(
+        theme: ReaderTheme,
+        size: Double,
+        weight: UIFont.Weight
+    ) -> UIFont {
+        let pointSize = CGFloat(size)
+        let systemFont = UIFont.systemFont(ofSize: pointSize, weight: weight)
+        var descriptor = systemFont.fontDescriptor
+        if theme == .claude {
+            descriptor = descriptor.withDesign(.serif) ?? descriptor
+        }
+
+        let traits = descriptor.symbolicTraits.union(.traitItalic)
+        descriptor = descriptor.withSymbolicTraits(traits) ?? descriptor
+        descriptor = descriptor.addingAttributes([
+            .cascadeList: [cjkItalicDescriptor(size: pointSize, weight: weight)]
+        ])
+        return UIFont(descriptor: descriptor, size: pointSize)
+    }
+
     private static func claudeFont(size: CGFloat, weight: UIFont.Weight) -> UIFont {
         let fallback = UIFont.systemFont(ofSize: size, weight: weight)
         let baseDescriptor = UIFont(
@@ -68,4 +133,18 @@ enum MarkdownTypography {
             "STSongti-SC-Regular"
         }
     }
+
+    private static func cjkItalicDescriptor(
+        size: CGFloat,
+        weight: UIFont.Weight
+    ) -> UIFontDescriptor {
+        let preferredName = weight.rawValue >= UIFont.Weight.semibold.rawValue
+            ? "STKaiti-SC-Bold"
+            : "STKaiti-SC-Regular"
+        let availableName = UIFont(name: preferredName, size: size) != nil
+            ? preferredName
+            : "STKaiti-SC-Regular"
+        return UIFontDescriptor(name: availableName, size: size)
+    }
+
 }

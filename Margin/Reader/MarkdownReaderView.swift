@@ -1,5 +1,4 @@
 import SwiftUI
-import UIKit
 
 struct MarkdownReaderView: View {
     let source: String
@@ -176,7 +175,7 @@ private struct MarkdownBlockView: View {
         case let .paragraph(text):
             InlineMarkdownText(
                 source: text,
-                font: documentFont(size: bodySize),
+                fonts: inlineFonts(size: bodySize),
                 foregroundStyle: theme.textPrimary,
                 theme: theme,
                 searchText: searchText,
@@ -212,7 +211,7 @@ private struct MarkdownBlockView: View {
         let multiplier = theme.headingScale(level: level)
         return InlineMarkdownText(
             source: text,
-            font: documentFont(size: bodySize * multiplier, weight: .semibold),
+            fonts: inlineFonts(size: bodySize * multiplier, weight: .semibold),
             foregroundStyle: level == 6 ? theme.textSecondary : theme.textStrong,
             theme: theme,
             searchText: searchText,
@@ -231,7 +230,7 @@ private struct MarkdownBlockView: View {
                 .frame(width: 2)
             InlineMarkdownText(
                 source: text,
-                font: documentFont(size: bodySize),
+                fonts: inlineFonts(size: bodySize),
                 foregroundStyle: theme.quoteText,
                 theme: theme,
                 searchText: searchText,
@@ -258,7 +257,7 @@ private struct MarkdownBlockView: View {
                         .frame(minWidth: 20, alignment: .trailing)
                     InlineMarkdownText(
                         source: item.text,
-                        font: documentFont(size: bodySize),
+                        fonts: inlineFonts(size: bodySize),
                         foregroundStyle: theme.textPrimary,
                         theme: theme,
                         searchText: searchText,
@@ -299,7 +298,7 @@ private struct MarkdownBlockView: View {
 
                     InlineMarkdownText(
                         source: item.text,
-                        font: documentFont(size: bodySize),
+                        fonts: inlineFonts(size: bodySize),
                         foregroundStyle: theme.textPrimary,
                         theme: theme,
                         searchText: searchText,
@@ -321,12 +320,7 @@ private struct MarkdownBlockView: View {
                     .font(.caption)
                     .foregroundStyle(theme.textSecondary)
                 Spacer()
-                Button("复制", systemImage: "doc.on.doc") {
-                    UIPasteboard.general.string = source
-                }
-                .labelStyle(.iconOnly)
-                .foregroundStyle(theme.textSecondary)
-                .frame(minWidth: 44, minHeight: 44)
+                CodeCopyButton(source: source, theme: theme)
             }
             ScrollView(.horizontal) {
                 SearchablePlainText(
@@ -361,7 +355,7 @@ private struct MarkdownBlockView: View {
                     ForEach(headers.enumerated(), id: \.offset) { columnIndex, value in
                         InlineMarkdownText(
                             source: value,
-                            font: documentFont(size: bodySize * 0.93, weight: .semibold),
+                            fonts: inlineFonts(size: bodySize * 0.93, weight: .semibold),
                             foregroundStyle: theme.textStrong,
                             theme: theme,
                             searchText: searchText,
@@ -377,7 +371,7 @@ private struct MarkdownBlockView: View {
                         ForEach(row.enumerated(), id: \.offset) { columnIndex, value in
                             InlineMarkdownText(
                                 source: value,
-                                font: documentFont(size: bodySize * 0.93),
+                                fonts: inlineFonts(size: bodySize * 0.93),
                                 foregroundStyle: theme.textPrimary,
                                 theme: theme,
                                 searchText: searchText,
@@ -486,6 +480,17 @@ private struct MarkdownBlockView: View {
         weight: UIFont.Weight = .regular
     ) -> Font {
         MarkdownTypography.documentFont(
+            theme: theme.readerTheme,
+            size: size,
+            weight: weight
+        )
+    }
+
+    private func inlineFonts(
+        size: Double,
+        weight: UIFont.Weight = .regular
+    ) -> InlineMarkdownFonts {
+        MarkdownTypography.inlineFonts(
             theme: theme.readerTheme,
             size: size,
             weight: weight

@@ -1,4 +1,5 @@
 import Testing
+import SwiftUI
 import UIKit
 @testable import Margin
 
@@ -123,6 +124,141 @@ struct MarkdownParserTests {
         #expect(sharedFile.lastPathComponent == "A-B-Document.md")
         #expect(try String(contentsOf: sharedFile, encoding: .utf8) ==
             "# Current\n\nLatest contents.")
+    }
+
+    @Test func renamesMarkdownDocumentsWithoutChangingTheirExtension() throws {
+        let folderURL = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: folderURL, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folderURL) }
+
+        let sourceURL = folderURL.appending(path: "Old.md")
+        try "# Test".write(to: sourceURL, atomically: true, encoding: .utf8)
+        let presenter = RecordingFilePresenter(url: sourceURL)
+        NSFileCoordinator.addFilePresenter(presenter)
+        defer { NSFileCoordinator.removeFilePresenter(presenter) }
+
+        let renamedURL = try DocumentRenamer.rename(fileAt: sourceURL, to: "New.md")
+
+        #expect(renamedURL.lastPathComponent == "New.md")
+        #expect(!FileManager.default.fileExists(atPath: sourceURL.path()))
+        #expect(try String(contentsOf: renamedURL, encoding: .utf8) == "# Test")
+        #expect(presenter.waitForMove(timeout: 2))
+        #expect(presenter.presentedItemURL == renamedURL)
+    }
+
+    @Test func validatesDocumentNamesBeforeRenaming() {
+        #expect(DocumentRenamer.isValidName("Notes"))
+        #expect(!DocumentRenamer.isValidName("   "))
+        #expect(!DocumentRenamer.isValidName("Folder/Notes"))
+    }
+
+    @Test @MainActor func documentSessionKeepsItsIdentityAndSavesAfterRenaming() async throws {
+        let folderURL = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: folderURL, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folderURL) }
+
+        let sourceURL = folderURL.appending(path: "Before.md")
+        try "# Before".write(to: sourceURL, atomically: true, encoding: .utf8)
+
+        let store = DocumentSessionStore()
+        let session = store.session(for: sourceURL, bootstrapText: "# Before")
+        let originalID = session.id
+        await session.openIfNeeded()
+        session.text = "# Edited before rename"
+
+        try await session.rename(to: "After")
+        session.text = "# Edited after rename"
+
+        try await session.rename(to: "Final")
+
+        #expect(session.id == originalID)
+        #expect(session.fileURL.lastPathComponent == "Final.md")
+        #expect(store.session(for: sourceURL, bootstrapText: "stale") === session)
+        #expect(!FileManager.default.fileExists(atPath: sourceURL.path()))
+        #expect(try String(contentsOf: session.fileURL, encoding: .utf8) ==
+            "# Edited after rename")
+    }
+
+    @Test @MainActor func rendersStrongEmphasisAndCombinedEmphasisWithConcreteFonts() {
+        let fonts = MarkdownTypography.inlineFonts(
+            theme: .claude,
+            size: 16
+        )
+        let attributed = InlineMarkdownStyler.attributedString(
+            source: "Plain **bold** and *italic* and ***both***.",
+            fonts: fonts,
+            theme: MarkdownTheme(readerTheme: .claude, colorScheme: .light)
+        )
+        let strongRuns = attributed.runs.filter {
+            $0.inlinePresentationIntent?.contains(.stronglyEmphasized) == true
+        }
+        let emphasizedRuns = attributed.runs.filter {
+            $0.inlinePresentationIntent?.contains(.emphasized) == true
+        }
+        let regularCJK = renderedMarkdown(
+            "中文强调",
+            fonts: fonts
+        )
+        let italicCJK = renderedMarkdown(
+            "*中文强调*",
+            fonts: fonts
+        )
+        let boldCJK = renderedMarkdown(
+            "**中文强调**",
+            fonts: fonts
+        )
+        let italicUIFont = MarkdownTypography.inlineItalicUIFont(
+            theme: .claude,
+            size: 16,
+            weight: .regular
+        )
+        let italicCascade = italicUIFont.fontDescriptor.object(forKey: .cascadeList)
+            as? [UIFontDescriptor]
+        let strongUIFont = MarkdownTypography.inlineStrongUIFont(
+            theme: .claude,
+            size: 16,
+            weight: .bold
+        )
+        let strongCascade = strongUIFont.fontDescriptor.object(forKey: .cascadeList)
+            as? [UIFontDescriptor]
+
+        #expect(strongRuns.count == 2)
+        #expect(emphasizedRuns.count == 2)
+        #expect(strongRuns.allSatisfy { $0.font != nil })
+        #expect(emphasizedRuns.allSatisfy { $0.font != nil })
+        #expect(regularCJK != nil)
+        #expect(italicCJK != regularCJK)
+        #expect(boldCJK != regularCJK)
+        #expect(italicUIFont.fontDescriptor.symbolicTraits.contains(.traitItalic))
+        #expect(italicCascade?.contains { $0.postscriptName.contains("Kaiti") } == true)
+        #expect(strongUIFont.fontDescriptor.withDesign(.serif) != nil)
+        #expect(
+            strongCascade?.contains { $0.postscriptName == "NotoSerifSC-SemiBold" }
+                == true
+        )
+    }
+
+    @MainActor
+    private func renderedMarkdown(
+        _ source: String,
+        fonts: InlineMarkdownFonts
+    ) -> Data? {
+        let theme = MarkdownTheme(readerTheme: .claude, colorScheme: .light)
+        let attributed = InlineMarkdownStyler.attributedString(
+            source: source,
+            fonts: fonts,
+            theme: theme
+        )
+        let renderer = ImageRenderer(
+            content: Text(attributed)
+                .font(fonts.regular)
+                .foregroundStyle(.black)
+                .padding(8)
+        )
+        renderer.scale = 2
+        return renderer.uiImage?.pngData()
     }
 
     @Test func printRendererProducesStyledHTMLAndEscapesContent() {

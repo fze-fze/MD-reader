@@ -2,7 +2,7 @@ import SwiftUI
 
 struct InlineMarkdownText: View {
     let source: String
-    let font: Font
+    let fonts: InlineMarkdownFonts
     let foregroundStyle: Color
     let theme: MarkdownTheme
     var searchText = ""
@@ -11,24 +11,17 @@ struct InlineMarkdownText: View {
 
     var body: some View {
         Text(attributedText)
-            .font(font)
+            .font(fonts.regular)
             .foregroundStyle(foregroundStyle)
             .tint(theme.accent)
     }
 
     private var attributedText: AttributedString {
-        var attributed = (try? AttributedString(
-            markdown: source,
-            options: AttributedString.MarkdownParsingOptions(
-                interpretedSyntax: .inlineOnlyPreservingWhitespace
-            )
-        )) ?? AttributedString(source)
-
-        for run in attributed.runs {
-            guard run.inlinePresentationIntent?.contains(.code) == true else { continue }
-            attributed[run.range].foregroundColor = theme.inlineCodeText
-            attributed[run.range].backgroundColor = theme.inlineCodeFill
-        }
+        let attributed = InlineMarkdownStyler.attributedString(
+            source: source,
+            fonts: fonts,
+            theme: theme
+        )
         return SearchHighlighting.apply(
             to: attributed,
             query: searchText,
