@@ -12,7 +12,11 @@ struct MDReaderApp: App {
             )
         }
 
-        DocumentGroupLaunchScene("launch.documents") {
+        DocumentGroupLaunchScene(
+            Text("launch.documents")
+                .font(.largeTitle.scaled(by: 1.2))
+                .bold()
+        ) {
             ThemeSelectionButton()
             NewDocumentButton("launch.start_writing", for: MarkdownDocument.self)
         } background: {

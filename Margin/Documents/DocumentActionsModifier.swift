@@ -4,6 +4,7 @@ struct DocumentActionsModifier: ViewModifier {
     let text: String
     let fileURL: URL?
     let displayName: String
+    @Binding var requestedAction: DocumentActionRequest?
 
     @State private var isCopyPresented = false
     @State private var isMovePresented = false
@@ -16,9 +17,6 @@ struct DocumentActionsModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .toolbarTitleMenu {
-                titleMenu
-            }
             .fileExporter(
                 isPresented: $isCopyPresented,
                 document: MarkdownDocument(text: text),
@@ -59,47 +57,43 @@ struct DocumentActionsModifier: ViewModifier {
                     dismissButton: .default(Text("common.ok"))
                 )
             }
+            .onChange(of: requestedAction) { _, request in
+                guard let request else { return }
+                requestedAction = nil
+                perform(request)
+            }
     }
 
-    @ViewBuilder
-    private var titleMenu: some View {
-        Section {
-            Button("document.copy", systemImage: "doc.on.doc") {
-                isCopyPresented = true
-            }
-
-            if fileURL != nil {
-                Button("document.move", systemImage: "folder") {
-                    isMovePresented = true
-                }
-            }
-
-            Button("document.rename", systemImage: "pencil", action: presentRenameDialog)
-                .disabled(fileURL == nil || isRenaming)
+    private func perform(_ request: DocumentActionRequest) {
+        switch request {
+        case .copy:
+            isCopyPresented = true
+        case .move:
+            guard fileURL != nil else { return }
+            isMovePresented = true
+        case .rename:
+            guard fileURL != nil, !isRenaming else { return }
+            presentRenameDialog()
+        case .share:
+            shareDocument()
+        case .print:
+            DocumentPrinter.present(
+                text: text,
+                title: displayName,
+                baseURL: fileURL?.deletingLastPathComponent()
+            )
         }
+    }
 
-        Section {
-            Button("document.share", systemImage: "square.and.arrow.up") {
-                Task { @MainActor in
-                    do {
-                        try await DocumentSharePresenter.present(
-                            markdown: text,
-                            suggestedName: displayName
-                        )
-                    } catch {
-                        actionError = .share(error)
-                    }
-                }
-            }
-        }
-
-        Section {
-            Button("document.print", systemImage: "printer") {
-                DocumentPrinter.present(
-                    text: text,
-                    title: displayName,
-                    baseURL: fileURL?.deletingLastPathComponent()
+    private func shareDocument() {
+        Task { @MainActor in
+            do {
+                try await DocumentSharePresenter.present(
+                    markdown: text,
+                    suggestedName: displayName
                 )
+            } catch {
+                actionError = .share(error)
             }
         }
     }

@@ -13,9 +13,11 @@ struct DocumentWorkspaceView: View {
     @State private var isSearchPresented = false
     @State private var scrollTarget: Int?
     @State private var isEditorFocused = false
+    @State private var requestedDocumentAction: DocumentActionRequest?
 
     @Environment(\.colorScheme) private var systemColorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dismiss) private var dismiss
 
     init(text: Binding<String>, fileURL: URL?) {
         _text = text
@@ -61,8 +63,22 @@ struct DocumentWorkspaceView: View {
             }
         }
         .environment(\.colorScheme, resolvedColorScheme)
-        .navigationTitle(displayName)
-        .navigationBarTitleDisplayMode(.inline)
+        .toolbarVisibility(.hidden, for: .navigationBar)
+        .safeAreaInset(edge: .top, spacing: 0) {
+            PagesDocumentNavigationBar(
+                mode: mode,
+                accent: theme.accent,
+                canUseReaderTools: mode == .read,
+                onDismiss: dismissWorkspace,
+                onSearch: presentSearch,
+                onToggleMode: toggleWorkspaceMode,
+                onSettings: presentSettings,
+                onOutline: presentOutline,
+                onDocumentInfo: presentDocumentInfo,
+                onDocumentAction: requestDocumentAction,
+                canMoveOrRename: fileURL != nil
+            )
+        }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if mode == .read, isSearchPresented {
                 DocumentSearchBar(
@@ -81,7 +97,8 @@ struct DocumentWorkspaceView: View {
             DocumentActionsModifier(
                 text: text,
                 fileURL: fileURL,
-                displayName: displayName
+                displayName: displayName,
+                requestedAction: $requestedDocumentAction
             )
         )
         .onAppear {
@@ -89,7 +106,6 @@ struct DocumentWorkspaceView: View {
                 beginEditing()
             }
         }
-        .toolbar { workspaceToolbar }
         .sheet(item: $presentedSheet) { sheet in
             sheetView(sheet)
         }
@@ -102,34 +118,32 @@ struct DocumentWorkspaceView: View {
         .preferredColorScheme(appearance.colorScheme)
     }
 
-    @ToolbarContentBuilder
-    private var workspaceToolbar: some ToolbarContent {
-        ToolbarItemGroup(placement: .topBarTrailing) {
-            if mode == .read {
-                Button("workspace.search", systemImage: "magnifyingglass", action: presentSearch)
-                    .keyboardShortcut("f", modifiers: .command)
-                workspaceMenu
-                Button("workspace.edit", action: beginEditing)
-            } else {
-                Button("common.done", action: finishEditing)
-                    .buttonStyle(.glassProminent)
-                    .tint(theme.accent)
-            }
+    private func dismissWorkspace() {
+        dismiss()
+    }
+
+    private func toggleWorkspaceMode() {
+        if mode == .read {
+            beginEditing()
+        } else {
+            finishEditing()
         }
     }
 
-    private var workspaceMenu: some View {
-        Menu("workspace.more", systemImage: "ellipsis") {
-            Button("workspace.outline", systemImage: "list.bullet.indent") {
-                presentedSheet = .outline
-            }
-            Button("workspace.reader_settings", systemImage: "textformat.size") {
-                presentedSheet = .settings
-            }
-            Button("workspace.document_info", systemImage: "info.circle") {
-                presentedSheet = .info
-            }
-        }
+    private func presentSettings() {
+        presentedSheet = .settings
+    }
+
+    private func presentOutline() {
+        presentedSheet = .outline
+    }
+
+    private func presentDocumentInfo() {
+        presentedSheet = .info
+    }
+
+    private func requestDocumentAction(_ action: DocumentActionRequest) {
+        requestedDocumentAction = action
     }
 
     private func beginEditing() {

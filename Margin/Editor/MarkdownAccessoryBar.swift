@@ -29,6 +29,7 @@ struct MarkdownAccessoryBar: View {
         }
         .scrollIndicators(.hidden)
         .frame(maxWidth: .infinity)
+        .tint(theme.accent)
         .background(.bar)
         .overlay(alignment: .top) {
             Divider().overlay(theme.separator.opacity(0.7))

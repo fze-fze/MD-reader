@@ -2,11 +2,12 @@
 "common.cancel" = "Cancel";
 "common.ok" = "OK";
 
-"launch.documents" = "Margin Documents";
+"launch.documents" = "Margin";
 "launch.start_writing" = "Start Writing";
 "launch.select_theme" = "Choose Theme";
 
 "workspace.untitled" = "Untitled";
+"workspace.back" = "Back to Documents";
 "workspace.search" = "Search";
 "workspace.edit" = "Edit";
 "workspace.more" = "More";

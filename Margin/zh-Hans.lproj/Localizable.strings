@@ -7,6 +7,7 @@
 "launch.select_theme" = "选取主题";
 
 "workspace.untitled" = "未命名";
+"workspace.back" = "返回文稿列表";
 "workspace.search" = "搜索";
 "workspace.edit" = "编辑";
 "workspace.more" = "更多";
