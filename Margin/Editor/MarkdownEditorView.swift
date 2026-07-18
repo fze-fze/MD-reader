@@ -91,9 +91,17 @@ struct MarkdownEditorView: View {
                 suffix: "`",
                 placeholder: L10n.string("editor.placeholder.code")
             )
+        case .inlineMath:
+            wrapSelection(
+                prefix: "$",
+                suffix: "$",
+                placeholder: L10n.string("editor.placeholder.math")
+            )
         case .quote: prefixCurrentLine("> ")
         case .list: prefixCurrentLine("- ")
         case .task: prefixCurrentLine("- [ ] ")
+        case .mathBlock:
+            insertMathBlock(placeholder: L10n.string("editor.placeholder.math"))
         }
     }
 
@@ -130,5 +138,32 @@ struct MarkdownEditorView: View {
         let lineRange = nsText.lineRange(for: NSRange(location: safeLocation, length: 0))
         editorText = nsText.replacingCharacters(in: NSRange(location: lineRange.location, length: 0), with: prefix)
         selectedRange.location += (prefix as NSString).length
+    }
+
+    // Display math must sit on standalone $$ lines for the parser to pick it
+    // up, so the insertion adds the newlines the caret position is missing and
+    // leaves the formula body (selection or placeholder) selected.
+    private func insertMathBlock(placeholder: String) {
+        let nsText = editorText as NSString
+        let location = min(selectedRange.location, nsText.length)
+        let length = min(selectedRange.length, nsText.length - location)
+        let range = NSRange(location: location, length: length)
+        let selected = nsText.substring(with: range)
+        let content = selected.isEmpty ? placeholder : selected
+
+        let newline: unichar = 0x0A
+        let needsLeadingNewline = location > 0
+            && nsText.character(at: location - 1) != newline
+        let trailingIndex = location + length
+        let needsTrailingNewline = trailingIndex < nsText.length
+            && nsText.character(at: trailingIndex) != newline
+
+        let prefix = (needsLeadingNewline ? "\n" : "") + "$$\n"
+        let suffix = "\n$$" + (needsTrailingNewline ? "\n" : "")
+        editorText = nsText.replacingCharacters(in: range, with: prefix + content + suffix)
+        selectedRange = NSRange(
+            location: location + (prefix as NSString).length,
+            length: (content as NSString).length
+        )
     }
 }

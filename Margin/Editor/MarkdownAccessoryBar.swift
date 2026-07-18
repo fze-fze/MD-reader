@@ -6,8 +6,8 @@ struct MarkdownAccessoryBar: View {
 
     @Environment(\.colorScheme) private var colorScheme
 
-    private let inlineActions: [MarkdownEditAction] = [.bold, .italic, .link, .code]
-    private let blockActions: [MarkdownEditAction] = [.list, .task, .quote]
+    private let inlineActions: [MarkdownEditAction] = [.bold, .italic, .link, .code, .inlineMath]
+    private let blockActions: [MarkdownEditAction] = [.list, .task, .quote, .mathBlock]
 
     var body: some View {
         ScrollView(.horizontal) {
@@ -37,7 +37,7 @@ struct MarkdownAccessoryBar: View {
     }
 
     private var formatMenu: some View {
-        Menu("editor.format", systemImage: "textformat") {
+        Menu {
             Button(MarkdownEditAction.body.label, systemImage: MarkdownEditAction.body.systemImage) {
                 onAction(.body)
             }
@@ -52,9 +52,12 @@ struct MarkdownAccessoryBar: View {
                     onAction(.heading3)
                 }
             }
+        } label: {
+            Label("editor.format", systemImage: "textformat")
+                .labelStyle(.iconOnly)
+                .frame(width: 44, height: 44)
+                .contentShape(.rect)
         }
-        .labelStyle(.iconOnly)
-        .frame(minWidth: 44, minHeight: 44)
         .accessibilityHint(Text("editor.format_hint"))
     }
 
@@ -66,11 +69,14 @@ struct MarkdownAccessoryBar: View {
     }
 
     private func actionButton(_ action: MarkdownEditAction) -> some View {
-        Button(action.label, systemImage: action.systemImage) {
+        Button {
             onAction(action)
+        } label: {
+            Label(action.label, systemImage: action.systemImage)
+                .labelStyle(.iconOnly)
+                .frame(width: 44, height: 44)
+                .contentShape(.rect)
         }
-        .labelStyle(.iconOnly)
-        .frame(minWidth: 44, minHeight: 44)
     }
 
     private var theme: MarkdownTheme {

@@ -190,15 +190,77 @@ struct MarkdownParserTests {
             return (block.id, source)
         }
 
-        #expect(mathBlocks.count == 3)
+        // Only $$ delimits display math; \[…\] stays ordinary text.
+        #expect(mathBlocks.count == 2)
         #expect(mathBlocks[0] == (2, "E = mc^2"))
         #expect(mathBlocks[1].source == "\\sum_{i=1}^n i")
-        #expect(mathBlocks[2].source == "\\frac{1}{2}")
         #expect(blocks.contains { if case .paragraph("中间段落") = $0.kind { true } else { false } })
         // Math blocks are searchable by their raw LaTeX source.
-        #expect(mathBlocks[0].id == 2)
         let firstMath = blocks.first { $0.id == 2 }
         #expect(firstMath?.searchableFragments == ["E = mc^2"])
+    }
+
+    @Test func rendersMultilineAlignedFormulasAfterNormalization() {
+        let source = """
+        \\begin{aligned}
+        \\mathcal{L}(\\theta)
+        &= -\\sum_{i=1}^{n}
+        \\left[
+        y_i \\log \\sigma\\!\\left(f_\\theta(x_i)\\right)
+        + (1-y_i)\\log\\!\\left(1-\\sigma\\!\\left(f_\\theta(x_i)\\right)\\right)
+        \\right] \\\\
+        &\\quad + \\lambda \\lVert \\theta \\rVert_2^2
+        + \\mu \\sum_{j=1}^{m}
+        \\left\\lVert
+        \\frac{\\partial f_\\theta(x)}{\\partial x_j}
+        \\right\\rVert_1,
+        \\qquad
+        \\sigma(z)=\\frac{1}{1+e^{-z}}.
+        \\end{aligned}
+        """
+
+        let normalized = MathRenderer.normalizedLatex(source)
+        #expect(!normalized.contains("\\lVert"))
+        #expect(!normalized.contains("\\rVert"))
+        #expect(normalized.contains("\\Vert"))
+    }
+
+    @Test @MainActor func rendersComplexAlignedFormulaToAnImage() {
+        let formula = MathRenderer.formula(
+            latex: """
+            \\begin{aligned}
+            \\mathcal{L}(\\theta)
+            &= -\\sum_{i=1}^{n}
+            \\left[
+            y_i \\log \\sigma\\!\\left(f_\\theta(x_i)\\right)
+            + (1-y_i)\\log\\!\\left(1-\\sigma\\!\\left(f_\\theta(x_i)\\right)\\right)
+            \\right] \\\\
+            &\\quad + \\lambda \\lVert \\theta \\rVert_2^2
+            + \\mu \\sum_{j=1}^{m}
+            \\left\\lVert
+            \\frac{\\partial f_\\theta(x)}{\\partial x_j}
+            \\right\\rVert_1,
+            \\qquad
+            \\sigma(z)=\\frac{1}{1+e^{-z}}.
+            \\end{aligned}
+            """,
+            fontSize: 17,
+            textColor: .black,
+            display: true,
+            readerTheme: .claude
+        )
+        #expect(formula != nil)
+        #expect((formula?.image.size.width ?? 0) > 100)
+        #expect((formula?.image.size.height ?? 0) > 40)
+    }
+
+    @Test func normalizesUnsupportedCommandsWithoutTouchingLongerNames() {
+        #expect(MathRenderer.normalizedLatex("\\dfrac{a}{b}") == "\\frac{a}{b}")
+        #expect(MathRenderer.normalizedLatex("\\operatorname{ReLU}(x)") == "\\mathrm{ReLU}(x)")
+        #expect(MathRenderer.normalizedLatex("a \\implies b") == "a \\Rightarrow b")
+        // A longer command that merely starts with an alias name is untouched.
+        #expect(MathRenderer.normalizedLatex("\\lVerticalMade{x}") == "\\lVerticalMade{x}")
+        #expect(MathRenderer.normalizedLatex("x + y") == "x + y")
     }
 
     @Test func leavesUnterminatedDisplayMathAsParagraph() {
@@ -222,15 +284,12 @@ struct MarkdownParserTests {
             .text("`code $x$` 之外 "),
             .math(latex: "y", isDisplay: false)
         ])
+        // Only $…$ delimits inline math: \(…\) and mid-sentence $$ stay text.
         #expect(InlineMathSegmenter.segments(in: "括号式 \\(a+b\\) 行内") == [
-            .text("括号式 "),
-            .math(latex: "a+b", isDisplay: false),
-            .text(" 行内")
+            .text("括号式 \\(a+b\\) 行内")
         ])
         #expect(InlineMathSegmenter.segments(in: "展示式 $$\\int_0^1 x$$ 嵌入") == [
-            .text("展示式 "),
-            .math(latex: "\\int_0^1 x", isDisplay: true),
-            .text(" 嵌入")
+            .text("展示式 $$\\int_0^1 x$$ 嵌入")
         ])
     }
 

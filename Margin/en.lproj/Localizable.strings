@@ -83,13 +83,16 @@
 "editor.italic" = "Italic";
 "editor.link" = "Link";
 "editor.inline_code" = "Inline Code";
+"editor.inline_math" = "Inline Math";
 "editor.quote" = "Quote";
 "editor.bullet_list" = "Bulleted List";
 "editor.task_list" = "Task List";
+"editor.math_block" = "Math Block";
 "editor.placeholder.bold" = "important";
 "editor.placeholder.italic" = "emphasis";
 "editor.placeholder.link" = "link text";
 "editor.placeholder.code" = "code";
+"editor.placeholder.math" = "formula";
 "editor.accessibility_label" = "Markdown editor";
 
 "outline.empty_title" = "No Outline";

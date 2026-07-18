@@ -83,13 +83,16 @@
 "editor.italic" = "斜体";
 "editor.link" = "链接";
 "editor.inline_code" = "行内代码";
+"editor.inline_math" = "行内公式";
 "editor.quote" = "引用";
 "editor.bullet_list" = "项目列表";
 "editor.task_list" = "任务列表";
+"editor.math_block" = "独立公式";
 "editor.placeholder.bold" = "重点";
 "editor.placeholder.italic" = "强调";
 "editor.placeholder.link" = "链接文字";
 "editor.placeholder.code" = "代码";
+"editor.placeholder.math" = "公式";
 "editor.accessibility_label" = "Markdown 编辑器";
 
 "outline.empty_title" = "没有目录";

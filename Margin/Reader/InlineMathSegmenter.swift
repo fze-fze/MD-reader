@@ -6,8 +6,10 @@ nonisolated enum InlineMathSegmenter {
         case math(latex: String, isDisplay: Bool)
     }
 
+    // Inline math is $…$ only; display $$ is a block-level construct handled
+    // by MarkdownParser, so a mid-sentence $$ stays literal text.
     static func segments(in source: String) -> [Segment] {
-        guard source.contains("$") || source.contains("\\(") else {
+        guard source.contains("$") else {
             return [.text(source)]
         }
 
@@ -26,17 +28,7 @@ nonisolated enum InlineMathSegmenter {
             let character = characters[index]
 
             if character == "\\", index + 1 < characters.count {
-                if characters[index + 1] == "(",
-                   let close = closingDelimiter(["\\", ")"], in: characters, from: index + 2) {
-                    let latex = trimmedLatex(characters[(index + 2)..<close])
-                    if !latex.isEmpty {
-                        flushText()
-                        segments.append(.math(latex: latex, isDisplay: false))
-                        index = close + 2
-                        continue
-                    }
-                }
-                // Any other escape (\$, \\, …) stays literal text.
+                // Escapes (\$, \\, …) stay literal text.
                 textBuffer.append(character)
                 textBuffer.append(characters[index + 1])
                 index += 2
@@ -58,15 +50,6 @@ nonisolated enum InlineMathSegmenter {
 
             if character == "$" {
                 if index + 1 < characters.count, characters[index + 1] == "$" {
-                    if let close = closingDelimiter(["$", "$"], in: characters, from: index + 2) {
-                        let latex = trimmedLatex(characters[(index + 2)..<close])
-                        if !latex.isEmpty {
-                            flushText()
-                            segments.append(.math(latex: latex, isDisplay: true))
-                            index = close + 2
-                            continue
-                        }
-                    }
                     textBuffer.append("$$")
                     index += 2
                     continue
@@ -113,26 +96,6 @@ nonisolated enum InlineMathSegmenter {
             } else {
                 cursor += 1
             }
-        }
-        return nil
-    }
-
-    private static func closingDelimiter(
-        _ delimiter: [Character],
-        in characters: [Character],
-        from index: Int
-    ) -> Int? {
-        var cursor = index
-        while cursor + delimiter.count <= characters.count {
-            if characters[cursor] == "\\", delimiter.first != "\\" {
-                cursor += 2
-                continue
-            }
-            if Array(characters[cursor..<(cursor + delimiter.count)]) == delimiter {
-                return cursor
-            }
-            if characters[cursor] == "\n" { return nil }
-            cursor += 1
         }
         return nil
     }

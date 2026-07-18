@@ -9,9 +9,11 @@ enum MarkdownEditAction: Identifiable {
     case italic
     case link
     case code
+    case inlineMath
     case quote
     case list
     case task
+    case mathBlock
 
     var id: Self { self }
 
@@ -25,9 +27,11 @@ enum MarkdownEditAction: Identifiable {
         case .italic: L10n.string("editor.italic")
         case .link: L10n.string("editor.link")
         case .code: L10n.string("editor.inline_code")
+        case .inlineMath: L10n.string("editor.inline_math")
         case .quote: L10n.string("editor.quote")
         case .list: L10n.string("editor.bullet_list")
         case .task: L10n.string("editor.task_list")
+        case .mathBlock: L10n.string("editor.math_block")
         }
     }
 
@@ -41,9 +45,11 @@ enum MarkdownEditAction: Identifiable {
         case .italic: "italic"
         case .link: "link"
         case .code: "chevron.left.forwardslash.chevron.right"
+        case .inlineMath: "x.squareroot"
         case .quote: "text.quote"
         case .list: "list.bullet"
         case .task: "checklist"
+        case .mathBlock: "function"
         }
     }
 }

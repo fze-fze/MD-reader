@@ -139,18 +139,13 @@ nonisolated enum MarkdownParser {
         return (hashes, String(line.dropFirst(hashes + 1)))
     }
 
-    // Display math: $$…$$ on one line, a $$ fence over several lines, or the
-    // \[…\] equivalents. An unterminated opener is not treated as math so a
-    // stray $$ cannot swallow the rest of the document.
+    // Display math is $$…$$ only: a standalone $$…$$ line, or a $$ fence over
+    // several lines. An unterminated opener is not treated as math so a stray
+    // $$ cannot swallow the rest of the document.
     private static func mathBlock(at index: Int, lines: [String]) -> (source: String, nextIndex: Int)? {
         let trimmed = lines[index].trimmingCharacters(in: .whitespaces)
-        if trimmed.hasPrefix("$$") {
-            return fencedMath(at: index, lines: lines, opening: "$$", closing: "$$")
-        }
-        if trimmed.hasPrefix("\\[") {
-            return fencedMath(at: index, lines: lines, opening: "\\[", closing: "\\]")
-        }
-        return nil
+        guard trimmed.hasPrefix("$$") else { return nil }
+        return fencedMath(at: index, lines: lines, opening: "$$", closing: "$$")
     }
 
     private static func fencedMath(

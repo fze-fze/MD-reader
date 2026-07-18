@@ -47,6 +47,39 @@ enum MathRenderer {
         return rendered
     }
 
+    // SwiftMath covers most of AMS math but misses a handful of very common
+    // commands; one unknown command fails the whole formula, so map them to
+    // supported equivalents before parsing. The negative lookahead keeps
+    // longer command names (e.g. \verta) untouched.
+    nonisolated private static let commandAliases: [(unsupported: String, replacement: String)] = [
+        ("lVert", "\\Vert"),
+        ("rVert", "\\Vert"),
+        ("lvert", "\\vert"),
+        ("rvert", "\\vert"),
+        ("dfrac", "\\frac"),
+        ("tfrac", "\\frac"),
+        ("operatorname", "\\mathrm"),
+        ("implies", "\\Rightarrow"),
+        ("impliedby", "\\Leftarrow"),
+        ("coloneqq", ":=")
+    ]
+
+    nonisolated static func normalizedLatex(_ latex: String) -> String {
+        guard latex.contains("\\") else { return latex }
+        var normalized = latex
+        for alias in commandAliases where normalized.contains("\\\(alias.unsupported)") {
+            guard let expression = try? NSRegularExpression(
+                pattern: "\\\\\(alias.unsupported)(?![a-zA-Z])"
+            ) else { continue }
+            normalized = expression.stringByReplacingMatches(
+                in: normalized,
+                range: NSRange(normalized.startIndex..., in: normalized),
+                withTemplate: NSRegularExpression.escapedTemplate(for: alias.replacement)
+            )
+        }
+        return normalized
+    }
+
     private static func render(
         latex: String,
         fontSize: CGFloat,
@@ -55,7 +88,7 @@ enum MathRenderer {
         readerTheme: ReaderTheme
     ) -> RenderedFormula? {
         var mathImage = MathImage(
-            latex: latex,
+            latex: normalizedLatex(latex),
             fontSize: fontSize,
             textColor: textColor,
             labelMode: display ? .display : .text,
