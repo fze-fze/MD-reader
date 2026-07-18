@@ -8,6 +8,7 @@ enum MarkdownTypography {
         let weight: Double
     }
 
+    @MainActor
     private static var inlineFontCache: [InlineFontCacheKey: InlineMarkdownFonts] = [:]
 
     static func documentFont(
@@ -32,6 +33,7 @@ enum MarkdownTypography {
         }
     }
 
+    @MainActor
     static func inlineFonts(
         theme: ReaderTheme,
         size: Double,

@@ -24,6 +24,14 @@ struct MarkdownTheme {
     var tableStrongRule: Color { color(claude: (0xCBB9A6, 0x48443E), github: (0xDFE2E5, 0x30363D)) }
     var tableRowRule: Color { color(claude: (0x72695E, 0xD8D2C5), github: (0xDFE2E5, 0x30363D)).opacity(colorScheme == .dark ? 0.52 : 0.4) }
     var frontMatterFill: Color { color(claude: (0xF6F1EA, 0x22211F), github: (0xF7F7F7, 0x161B22)) }
+    var navigationControl: Color { color(claude: (0x262422, 0xFFFFFF), github: (0x24292F, 0xF0F6FC)) }
+    var navigationSurface: Color {
+        color(claude: (0xF7F4EE, 0x292724), github: (0xFFFFFF, 0x0D1117))
+            .opacity(colorScheme == .dark ? 0.58 : 0.64)
+    }
+    var navigationGlassTint: Color {
+        Color.white.opacity(colorScheme == .dark ? 0.08 : 0.18)
+    }
 
     var codeFont: Font.Design { .monospaced }
     var contentMaxWidth: CGFloat { readerTheme == .claude ? 780 : 860 }

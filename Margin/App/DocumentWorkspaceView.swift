@@ -8,6 +8,7 @@ struct DocumentWorkspaceView: View {
     @AppStorage("readerTextScale") private var textScale = 1.0
     @AppStorage("readerTheme") private var readerTheme = ReaderTheme.claude
     @State private var mode: WorkspaceMode = .read
+    @State private var readerSource: String
     @State private var presentedSheet: WorkspaceSheet?
     @State private var searchSession = DocumentSearchSession()
     @State private var isSearchPresented = false
@@ -21,6 +22,7 @@ struct DocumentWorkspaceView: View {
 
     init(text: Binding<String>, fileURL: URL?) {
         _text = text
+        _readerSource = State(initialValue: text.wrappedValue)
         self.fileURL = fileURL
     }
 
@@ -41,18 +43,20 @@ struct DocumentWorkspaceView: View {
             theme.canvas
                 .ignoresSafeArea()
 
-            if mode == .read {
-                MarkdownReaderView(
-                    source: text,
-                    searchSession: searchSession,
-                    scrollTarget: $scrollTarget,
-                    textScale: textScale,
-                    baseURL: fileURL?.deletingLastPathComponent(),
-                    readerTheme: readerTheme,
-                    onToggleTask: toggleTask
-                )
-                .transition(.opacity)
-            } else {
+            MarkdownReaderView(
+                source: readerSource,
+                searchSession: searchSession,
+                scrollTarget: $scrollTarget,
+                textScale: textScale,
+                baseURL: fileURL?.deletingLastPathComponent(),
+                readerTheme: readerTheme,
+                onToggleTask: toggleTask
+            )
+            .opacity(mode == .read ? 1 : 0)
+            .allowsHitTesting(mode == .read)
+            .accessibilityHidden(mode != .read)
+
+            if mode == .edit {
                 MarkdownEditorView(
                     text: $text,
                     textScale: textScale,
@@ -64,10 +68,11 @@ struct DocumentWorkspaceView: View {
         }
         .environment(\.colorScheme, resolvedColorScheme)
         .toolbarVisibility(.hidden, for: .navigationBar)
+        .background(InteractivePopGestureRestorer())
         .safeAreaInset(edge: .top, spacing: 0) {
             PagesDocumentNavigationBar(
                 mode: mode,
-                accent: theme.accent,
+                theme: theme,
                 canUseReaderTools: mode == .read,
                 onDismiss: dismissWorkspace,
                 onSearch: presentSearch,
@@ -104,6 +109,11 @@ struct DocumentWorkspaceView: View {
         .onAppear {
             if QuickActionDocumentCreator.consumeEditorRequest(for: fileURL) {
                 beginEditing()
+            }
+        }
+        .onChange(of: text) { _, updatedText in
+            if mode == .read {
+                readerSource = updatedText
             }
         }
         .sheet(item: $presentedSheet) { sheet in
@@ -148,6 +158,7 @@ struct DocumentWorkspaceView: View {
 
     private func beginEditing() {
         dismissSearch()
+        readerSource = text
         mode = .edit
         Task { @MainActor in
             await Task.yield()
@@ -157,6 +168,7 @@ struct DocumentWorkspaceView: View {
 
     private func finishEditing() {
         isEditorFocused = false
+        readerSource = text
         mode = .read
     }
 
@@ -171,10 +183,12 @@ struct DocumentWorkspaceView: View {
     }
 
     private func toggleTask(atLine lineNumber: Int) {
-        text = MarkdownTaskToggler.toggledSource(
+        let updatedText = MarkdownTaskToggler.toggledSource(
             text,
             taskAtLine: lineNumber
         )
+        text = updatedText
+        readerSource = updatedText
     }
 
     @ViewBuilder
@@ -185,7 +199,7 @@ struct DocumentWorkspaceView: View {
                 headings: MarkdownParser.headings(in: text),
                 readerTheme: readerTheme
             ) { headingID in
-                mode = .read
+                finishEditing()
                 scrollTarget = headingID
             }
         case .settings:

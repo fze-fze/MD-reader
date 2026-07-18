@@ -3,6 +3,15 @@ import Foundation
 @MainActor
 @Observable
 final class DocumentSearchSession {
+    private struct Results {
+        var effectiveQuery = ""
+        var matches: [DocumentSearchIndex.Match] = []
+        var matchedBlockIDs: Set<Int> = []
+        var currentMatchIndex: Int?
+
+        static let empty = Results()
+    }
+
     struct Request: Equatable {
         let indexRevision: Int
         let query: String
@@ -11,16 +20,19 @@ final class DocumentSearchSession {
 
     var query = ""
 
-    private(set) var effectiveQuery = ""
-    private(set) var matches: [DocumentSearchIndex.Match] = []
-    private(set) var matchedBlockIDs: Set<Int> = []
-    private(set) var currentMatchIndex: Int?
+    private var results = Results.empty
     private(set) var isSearching = false
     private(set) var navigationRevision = 0
     private(set) var isActive = false
 
     private var index = DocumentSearchIndex()
     private var indexRevision = 0
+    private var searchRevision = 0
+
+    var effectiveQuery: String { results.effectiveQuery }
+    var matches: [DocumentSearchIndex.Match] { results.matches }
+    var matchedBlockIDs: Set<Int> { results.matchedBlockIDs }
+    var currentMatchIndex: Int? { results.currentMatchIndex }
 
     var request: Request {
         Request(indexRevision: indexRevision, query: query, isActive: isActive)
@@ -79,8 +91,15 @@ final class DocumentSearchSession {
             return
         }
 
-        resetResults()
+        let indexRevisionSnapshot = indexRevision
+        searchRevision &+= 1
+        let searchRevisionSnapshot = searchRevision
         isSearching = true
+        defer {
+            if searchRevisionSnapshot == searchRevision {
+                isSearching = false
+            }
+        }
 
         do {
             try await Task.sleep(for: .milliseconds(180))
@@ -98,25 +117,28 @@ final class DocumentSearchSession {
         }
         guard !Task.isCancelled,
               isActive,
+              searchRevisionSnapshot == searchRevision,
+              indexRevisionSnapshot == indexRevision,
               querySnapshot == query.trimmingCharacters(
             in: .whitespacesAndNewlines
         ) else {
             return
         }
 
-        effectiveQuery = querySnapshot
-        matches = results
-        matchedBlockIDs = Set(results.map(\.blockID))
-        currentMatchIndex = nil
-        isSearching = false
+        self.results = Results(
+            effectiveQuery: querySnapshot,
+            matches: results,
+            matchedBlockIDs: Set(results.map(\.blockID)),
+            currentMatchIndex: nil
+        )
     }
 
     func moveToNext() {
         guard !matches.isEmpty else { return }
         if let currentMatchIndex {
-            self.currentMatchIndex = (currentMatchIndex + 1) % matches.count
+            results.currentMatchIndex = (currentMatchIndex + 1) % matches.count
         } else {
-            currentMatchIndex = 0
+            results.currentMatchIndex = 0
         }
         navigationRevision &+= 1
     }
@@ -124,9 +146,9 @@ final class DocumentSearchSession {
     func moveToPrevious() {
         guard !matches.isEmpty else { return }
         if let currentMatchIndex {
-            self.currentMatchIndex = (currentMatchIndex - 1 + matches.count) % matches.count
+            results.currentMatchIndex = (currentMatchIndex - 1 + matches.count) % matches.count
         } else {
-            currentMatchIndex = matches.count - 1
+            results.currentMatchIndex = matches.count - 1
         }
         navigationRevision &+= 1
     }
@@ -137,10 +159,8 @@ final class DocumentSearchSession {
     }
 
     private func resetResults() {
-        effectiveQuery = ""
-        matches = []
-        matchedBlockIDs = []
-        currentMatchIndex = nil
+        searchRevision &+= 1
+        results = .empty
         isSearching = false
     }
 }

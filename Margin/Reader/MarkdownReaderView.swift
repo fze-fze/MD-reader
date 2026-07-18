@@ -362,7 +362,7 @@ private struct MarkdownBlockView: View {
     private func markdownImage(alt: String, source: String) -> some View {
         VStack(alignment: .leading, spacing: 7) {
             if let url = URL(string: source), ["http", "https"].contains(url.scheme?.lowercased()) {
-                AsyncImage(url: url) { phase in
+                CachedAsyncImage(url: url) { phase in
                     switch phase {
                     case let .success(image):
                         image.resizable().scaledToFit()

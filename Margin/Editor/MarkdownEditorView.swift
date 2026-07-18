@@ -10,13 +10,34 @@ struct MarkdownEditorView: View {
     @ScaledMetric(relativeTo: .body) private var bodySize = 16.0
     @State private var selectedRange = NSRange(location: 0, length: 0)
 
+    // The editor owns a synchronous mirror of the document text. Feeding the
+    // UITextView from the DocumentGroup binding directly lets a stale binding
+    // round-trip revert fresh keystrokes in updateUIView, which flings the
+    // caret — and the scroll position — to the end of the document. While the
+    // editor is on screen this mirror is the source of truth and only pushes
+    // outward; the editor is recreated from the binding on each edit session.
+    @State private var editorText: String
+
+    init(
+        text: Binding<String>,
+        textScale: Double,
+        isFocused: Binding<Bool>,
+        readerTheme: ReaderTheme
+    ) {
+        _text = text
+        _editorText = State(initialValue: text.wrappedValue)
+        self.textScale = textScale
+        _isFocused = isFocused
+        self.readerTheme = readerTheme
+    }
+
     private var theme: MarkdownTheme {
         MarkdownTheme(readerTheme: readerTheme, colorScheme: colorScheme)
     }
 
     var body: some View {
         NativeMarkdownTextView(
-            text: $text,
+            text: $editorText,
             selectedRange: $selectedRange,
             isFocused: $isFocused,
             theme: theme,
@@ -26,6 +47,11 @@ struct MarkdownEditorView: View {
         .frame(maxWidth: 820)
         .frame(maxWidth: .infinity)
         .background(theme.canvas)
+        .onChange(of: editorText) { _, updatedText in
+            if text != updatedText {
+                text = updatedText
+            }
+        }
         .safeAreaBar(edge: .bottom) {
             if isFocused {
                 MarkdownAccessoryBar(readerTheme: readerTheme) { action in
@@ -72,7 +98,7 @@ struct MarkdownEditorView: View {
     }
 
     private func setHeadingPrefix(_ prefix: String) {
-        let nsText = text as NSString
+        let nsText = editorText as NSString
         let safeLocation = min(selectedRange.location, nsText.length)
         let lineRange = nsText.lineRange(for: NSRange(location: safeLocation, length: 0))
         let line = nsText.substring(with: lineRange)
@@ -80,7 +106,7 @@ struct MarkdownEditorView: View {
         let hasHeadingPrefix = (1...6).contains(hashCount) && line.dropFirst(hashCount).first == " "
         let oldPrefixLength = hasHeadingPrefix ? hashCount + 1 : 0
         let replacementRange = NSRange(location: lineRange.location, length: oldPrefixLength)
-        text = nsText.replacingCharacters(in: replacementRange, with: prefix)
+        editorText = nsText.replacingCharacters(in: replacementRange, with: prefix)
 
         let offsetInLine = max(0, selectedRange.location - lineRange.location)
         let adjustedOffset = max(0, offsetInLine - oldPrefixLength) + (prefix as NSString).length
@@ -88,21 +114,21 @@ struct MarkdownEditorView: View {
     }
 
     private func wrapSelection(prefix: String, suffix: String, placeholder: String) {
-        guard let range = Range(selectedRange, in: text) else { return }
-        let selected = String(text[range])
+        guard let range = Range(selectedRange, in: editorText) else { return }
+        let selected = String(editorText[range])
         let content = selected.isEmpty ? placeholder : selected
         let replacement = prefix + content + suffix
-        text.replaceSubrange(range, with: replacement)
+        editorText.replaceSubrange(range, with: replacement)
         let prefixLength = (prefix as NSString).length
         let contentLength = (content as NSString).length
         selectedRange = NSRange(location: selectedRange.location + prefixLength, length: contentLength)
     }
 
     private func prefixCurrentLine(_ prefix: String) {
-        let nsText = text as NSString
+        let nsText = editorText as NSString
         let safeLocation = min(selectedRange.location, nsText.length)
         let lineRange = nsText.lineRange(for: NSRange(location: safeLocation, length: 0))
-        text = nsText.replacingCharacters(in: NSRange(location: lineRange.location, length: 0), with: prefix)
+        editorText = nsText.replacingCharacters(in: NSRange(location: lineRange.location, length: 0), with: prefix)
         selectedRange.location += (prefix as NSString).length
     }
 }

@@ -126,6 +126,79 @@ struct MarkdownParserTests {
         #expect(!session.isActive)
     }
 
+    @Test @MainActor func searchKeepsPreviousHighlightsUntilReplacementIsReady() async throws {
+        let blocks = MarkdownParser.parse("Alpha alpha beta")
+        let session = DocumentSearchSession()
+        session.replaceIndex(DocumentSearchIndex(blocks: blocks))
+        session.activate()
+        session.query = "alpha"
+        await session.performSearch()
+
+        #expect(session.matches.count == 2)
+        #expect(session.effectiveQuery == "alpha")
+
+        session.query = "beta"
+        let replacementSearch = Task { await session.performSearch() }
+        try await Task.sleep(for: .milliseconds(20))
+
+        #expect(session.isSearching)
+        #expect(session.matches.count == 2)
+        #expect(session.effectiveQuery == "alpha")
+
+        await replacementSearch.value
+        #expect(!session.isSearching)
+        #expect(session.matches.count == 1)
+        #expect(session.effectiveQuery == "beta")
+    }
+
+    @Test @MainActor func cancellingCurrentSearchStopsProgress() async {
+        let blocks = MarkdownParser.parse("Alpha beta")
+        let session = DocumentSearchSession()
+        session.replaceIndex(DocumentSearchIndex(blocks: blocks))
+        session.activate()
+        session.query = "alpha"
+
+        let search = Task { await session.performSearch() }
+        await Task.yield()
+        search.cancel()
+        await search.value
+
+        #expect(!session.isSearching)
+        #expect(session.matches.isEmpty)
+    }
+
+    @Test func computesMinimalEditorTextReplacements() {
+        let cases: [(old: String, new: String)] = [
+            ("Line one\nLine two", "Line one\n**Line** two"),
+            ("# 标题\n正文段落", "# 标题\n正文一段落"),
+            ("Alpha beta gamma", "Alpha gamma"),
+            ("Plain", "**Plain**"),
+            ("😀 emoji", "😁 emoji"),
+            ("", "Fresh document"),
+            ("Old contents", ""),
+            ("Same", "Same")
+        ]
+
+        for testCase in cases {
+            let change = NativeMarkdownTextView.changedRange(
+                from: testCase.old,
+                to: testCase.new
+            )
+            let applied = (testCase.old as NSString).replacingCharacters(
+                in: change.range,
+                with: change.replacement
+            )
+            #expect(applied == testCase.new)
+        }
+
+        let insertion = NativeMarkdownTextView.changedRange(
+            from: "Hello world",
+            to: "Hello brave world"
+        )
+        #expect(insertion.range == NSRange(location: 6, length: 0))
+        #expect(insertion.replacement == "brave ")
+    }
+
     @Test func claudeThemeUsesAnthropicSerifWithBundledCJKSerifFallback() {
         let font = MarkdownTypography.documentUIFont(theme: .claude, size: 16)
         let cascade = font.fontDescriptor.object(forKey: .cascadeList)

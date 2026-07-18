@@ -3,6 +3,7 @@ import SwiftUI
 struct PagesWorkspaceToolbar: View {
     let mode: WorkspaceMode
     let accent: Color
+    let glassTint: Color
     let canUseReaderTools: Bool
     let onSearch: () -> Void
     let onToggleMode: () -> Void
@@ -12,29 +13,37 @@ struct PagesWorkspaceToolbar: View {
     let onDocumentAction: (DocumentActionRequest) -> Void
     let canMoveOrRename: Bool
 
-    @Environment(\.colorScheme) private var colorScheme
-
     var body: some View {
         HStack(spacing: 2) {
-            Button("workspace.search", systemImage: "magnifyingglass", action: onSearch)
-                .keyboardShortcut("f", modifiers: .command)
-                .disabled(!canUseReaderTools)
-                .frame(minWidth: 44, minHeight: 44)
+            // A Button's tap target is its label, so the 44pt frame (and the
+            // hit shape covering it) must live inside the label — outside the
+            // button it only reserves layout space around a glyph-sized target.
+            Button(action: onSearch) {
+                Label("workspace.search", systemImage: "magnifyingglass")
+                    .frame(width: 44, height: 44)
+                    .contentShape(.rect)
+            }
+            .keyboardShortcut("f", modifiers: .command)
+            .disabled(!canUseReaderTools)
 
-            Button(
-                mode == .read ? "workspace.edit" : "common.done",
-                systemImage: mode == .read ? "square.and.pencil" : "checkmark.circle.fill",
-                action: onToggleMode
-            )
+            Button(action: onToggleMode) {
+                Label(
+                    mode == .read ? "workspace.edit" : "common.done",
+                    systemImage: mode == .read ? "square.and.pencil" : "checkmark.circle.fill"
+                )
+                .font(.title2.bold())
+                .frame(width: 44, height: 44)
+                .contentShape(.rect)
+            }
             .foregroundStyle(accent)
-            .font(.title2.bold())
-            .frame(minWidth: 44, minHeight: 44)
 
-            Button("workspace.reader_settings", systemImage: "paintbrush", action: onSettings)
-                .frame(minWidth: 44, minHeight: 44)
+            Button(action: onSettings) {
+                Label("workspace.reader_settings", systemImage: "paintbrush")
+                    .frame(width: 44, height: 44)
+                    .contentShape(.rect)
+            }
 
             documentMenu
-                .frame(minWidth: 44, minHeight: 44)
         }
         .labelStyle(.iconOnly)
         .font(.title3)
@@ -48,7 +57,7 @@ struct PagesWorkspaceToolbar: View {
     }
 
     private var documentMenu: some View {
-        Menu("workspace.more", systemImage: "ellipsis") {
+        Menu {
             Section {
                 Button("workspace.outline", systemImage: "list.bullet.indent", action: onOutline)
                 Button("workspace.document_info", systemImage: "info.circle", action: onDocumentInfo)
@@ -76,12 +85,10 @@ struct PagesWorkspaceToolbar: View {
                     onDocumentAction(.print)
                 }
             }
+        } label: {
+            Label("workspace.more", systemImage: "ellipsis")
+                .frame(width: 44, height: 44)
+                .contentShape(.rect)
         }
-    }
-
-    private var glassTint: Color {
-        colorScheme == .dark
-            ? .white.opacity(0.08)
-            : .white.opacity(0.18)
     }
 }

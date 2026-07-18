@@ -22,31 +22,32 @@ struct DocumentSearchBar: View {
 
             searchStatus
 
-            Button(
-                "reader.previous_match",
-                systemImage: "chevron.up",
-                action: session.moveToPrevious
-            )
-            .labelStyle(.iconOnly)
-            .frame(width: 40, height: 44)
+            Button(action: session.moveToPrevious) {
+                Label("reader.previous_match", systemImage: "chevron.up")
+                    .labelStyle(.iconOnly)
+                    .frame(width: 40, height: 44)
+                    .contentShape(.rect)
+            }
             .disabled(!session.hasMatches)
             .keyboardShortcut("g", modifiers: [.command, .shift])
 
-            Button(
-                "reader.next_match",
-                systemImage: "chevron.down",
-                action: session.moveToNext
-            )
-            .labelStyle(.iconOnly)
-            .frame(width: 40, height: 44)
+            Button(action: session.moveToNext) {
+                Label("reader.next_match", systemImage: "chevron.down")
+                    .labelStyle(.iconOnly)
+                    .frame(width: 40, height: 44)
+                    .contentShape(.rect)
+            }
             .disabled(!session.hasMatches)
             .keyboardShortcut("g", modifiers: .command)
 
-            Button("common.done", systemImage: "xmark.circle.fill", action: onDismiss)
-                .labelStyle(.iconOnly)
-                .foregroundStyle(theme.textSecondary)
-                .frame(width: 40, height: 44)
-                .keyboardShortcut(.cancelAction)
+            Button(action: onDismiss) {
+                Label("common.close", systemImage: "xmark.circle.fill")
+                    .labelStyle(.iconOnly)
+                    .frame(width: 40, height: 44)
+                    .contentShape(.rect)
+            }
+            .foregroundStyle(theme.textSecondary)
+            .keyboardShortcut(.cancelAction)
         }
         .padding(.leading, 14)
         .padding(.trailing, 4)
@@ -70,17 +71,18 @@ struct DocumentSearchBar: View {
 
     @ViewBuilder
     private var searchStatus: some View {
-        if session.isSearching {
-            ProgressView()
-                .controlSize(.small)
-                .frame(width: 54)
-                .accessibilityLabel(L10n.string("workspace.search"))
-        } else if !session.effectiveQuery.isEmpty {
-            Text(session.statusText)
-                .font(.footnote.monospacedDigit())
-                .foregroundStyle(theme.textSecondary)
-                .lineLimit(1)
-                .frame(minWidth: 46)
+        Group {
+            if session.isSearching {
+                ProgressView()
+                    .controlSize(.small)
+                    .accessibilityLabel(L10n.string("workspace.search"))
+            } else if !session.effectiveQuery.isEmpty {
+                Text(session.statusText)
+                    .font(.footnote.monospacedDigit())
+                    .foregroundStyle(theme.textSecondary)
+                    .lineLimit(1)
+            }
         }
+        .frame(minWidth: 54)
     }
 }

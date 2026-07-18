@@ -28,6 +28,7 @@ struct NativeMarkdownTextView: UIViewRepresentable {
         view.smartDashesType = .no
         view.smartQuotesType = .no
         view.smartInsertDeleteType = .no
+        view.isFindInteractionEnabled = true
         view.accessibilityLabel = L10n.string("editor.accessibility_label")
         view.text = text
         applyTypography(to: view)
@@ -42,10 +43,8 @@ struct NativeMarkdownTextView: UIViewRepresentable {
     func updateUIView(_ view: UITextView, context: Context) {
         context.coordinator.parent = self
         let hasMarkedText = view.markedTextRange != nil
-        var replacedText = false
         if !hasMarkedText, view.text != text {
-            view.text = text
-            replacedText = true
+            replaceChangedRange(in: view, with: text)
         }
         if !hasMarkedText,
            view.selectedRange != selectedRange,
@@ -60,7 +59,7 @@ struct NativeMarkdownTextView: UIViewRepresentable {
             bodySize: bodySize,
             textColor: UIColor(theme.textPrimary)
         )
-        if !hasMarkedText, replacedText || typographyChanged {
+        if !hasMarkedText, typographyChanged {
             view.font = documentFont
             applyTypography(to: view)
             context.coordinator.recordTypography(
@@ -85,7 +84,65 @@ struct NativeMarkdownTextView: UIViewRepresentable {
         MarkdownTypography.documentUIFont(theme: readerTheme, size: bodySize)
     }
 
+    // Assigning `UITextView.text` moves the caret to the end of the document
+    // and schedules an auto-scroll to it on the next layout pass, so a whole-
+    // text assignment jumps the viewport no matter what is restored afterwards.
+    // Replacing only the changed region in the text storage leaves the caret
+    // and scroll position alone.
+    private func replaceChangedRange(in view: UITextView, with newText: String) {
+        let change = Self.changedRange(from: view.text, to: newText)
+        view.textStorage.replaceCharacters(in: change.range, with: change.replacement)
+        applyTypography(
+            to: view,
+            range: NSRange(
+                location: change.range.location,
+                length: (change.replacement as NSString).length
+            )
+        )
+    }
+
+    nonisolated static func changedRange(
+        from oldText: String,
+        to newText: String
+    ) -> (range: NSRange, replacement: String) {
+        let oldValue = oldText as NSString
+        let newValue = newText as NSString
+        let minLength = min(oldValue.length, newValue.length)
+
+        var prefixLength = 0
+        while prefixLength < minLength,
+              oldValue.character(at: prefixLength) == newValue.character(at: prefixLength) {
+            prefixLength += 1
+        }
+
+        var suffixLength = 0
+        while suffixLength < minLength - prefixLength,
+              oldValue.character(at: oldValue.length - 1 - suffixLength)
+                == newValue.character(at: newValue.length - 1 - suffixLength) {
+            suffixLength += 1
+        }
+
+        let range = NSRange(
+            location: prefixLength,
+            length: oldValue.length - prefixLength - suffixLength
+        )
+        let replacement = newValue.substring(
+            with: NSRange(
+                location: prefixLength,
+                length: newValue.length - prefixLength - suffixLength
+            )
+        )
+        return (range, replacement)
+    }
+
     private func applyTypography(to view: UITextView) {
+        applyTypography(
+            to: view,
+            range: NSRange(location: 0, length: view.textStorage.length)
+        )
+    }
+
+    private func applyTypography(to view: UITextView, range: NSRange) {
         let paragraphStyle = NSMutableParagraphStyle()
         paragraphStyle.lineHeightMultiple = 1.36
 
@@ -96,11 +153,8 @@ struct NativeMarkdownTextView: UIViewRepresentable {
         ]
         view.typingAttributes = attributes
 
-        guard view.textStorage.length > 0 else { return }
-        view.textStorage.addAttributes(
-            attributes,
-            range: NSRange(location: 0, length: view.textStorage.length)
-        )
+        guard range.length > 0 else { return }
+        view.textStorage.addAttributes(attributes, range: range)
     }
 
     @MainActor
