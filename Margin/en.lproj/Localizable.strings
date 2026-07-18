@@ -65,11 +65,8 @@
 "document.error.share_title" = "Unable to Share Document";
 "document.error.files_retry" = "Try again later, or complete this action in the Files app.";
 "document.error.invalid_name" = "Enter a valid document name. Names cannot contain \"/\".";
-"document.error.name_exists" = "A document named \"%@\" already exists in this folder.";
+"document.error.rename_unavailable" = "Margin could not access the system document browser. Close this document, reopen it, and try again.";
 "document.error.not_ready" = "The document is not ready yet. Try again in a moment.";
-"document.error.save_before_rename" = "There was a problem saving your changes, so the document was not renamed.";
-"document.error.close_before_rename" = "There was a problem closing the old document session, so the document was not renamed.";
-"document.error.reopen_after_rename" = "The document could not be reopened at its new location.";
 "document.error.no_share_window" = "No active window is available to show the share sheet.";
 "document.share.untitled" = "Untitled";
 "quick_action.new_document" = "New Markdown Document";
@@ -112,6 +109,7 @@
 "reader.code_block" = "Code block";
 "reader.code_block_language" = "%@ code block";
 "reader.table_accessibility" = "Table, %lld columns, %lld rows";
+"reader.math_accessibility" = "Math formula: %@";
 "reader.metadata_accessibility" = "Document metadata: %@";
 "reader.document_image" = "Document image";
 "reader.image_error_title" = "Unable to Load Image";

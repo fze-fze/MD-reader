@@ -11,7 +11,8 @@ struct PagesWorkspaceToolbar: View {
     let onOutline: () -> Void
     let onDocumentInfo: () -> Void
     let onDocumentAction: (DocumentActionRequest) -> Void
-    let canMoveOrRename: Bool
+    let canMove: Bool
+    let canRename: Bool
 
     var body: some View {
         HStack(spacing: 2) {
@@ -70,11 +71,11 @@ struct PagesWorkspaceToolbar: View {
                 Button("document.move", systemImage: "folder") {
                     onDocumentAction(.move)
                 }
-                .disabled(!canMoveOrRename)
+                .disabled(!canMove)
                 Button("document.rename", systemImage: "pencil") {
                     onDocumentAction(.rename)
                 }
-                .disabled(!canMoveOrRename)
+                .disabled(!canRename)
             }
 
             Section {

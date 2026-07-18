@@ -1,71 +1,77 @@
 import Foundation
+import UIKit
 
+@MainActor
 enum DocumentRenamer {
-    nonisolated static func isValidName(_ proposedName: String) -> Bool {
+    static func isValidName(_ proposedName: String) -> Bool {
         let name = proposedName.trimmingCharacters(in: .whitespacesAndNewlines)
         return !name.isEmpty && name != "." && name != ".." && !name.contains("/")
     }
 
-    nonisolated static func rename(fileAt sourceURL: URL, to proposedName: String) throws -> URL {
+    static func rename(fileAt sourceURL: URL, to proposedName: String) async throws -> URL {
         let trimmedName = proposedName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard isValidName(trimmedName) else {
             throw renameError(L10n.string("document.error.invalid_name"))
         }
 
-        let pathExtension = sourceURL.pathExtension
-        let baseName = removingExtension(pathExtension, from: trimmedName)
-        let destinationURL = sourceURL
-            .deletingLastPathComponent()
-            .appending(path: baseName)
-            .appendingPathExtension(pathExtension)
-
-        guard destinationURL.standardizedFileURL != sourceURL.standardizedFileURL else {
+        let baseName = removingExtension(sourceURL.pathExtension, from: trimmedName)
+        guard baseName != sourceURL.deletingPathExtension().lastPathComponent else {
             return sourceURL
         }
-        guard !FileManager.default.fileExists(atPath: destinationURL.path()) else {
-            throw renameError(
-                L10n.format("document.error.name_exists", destinationURL.lastPathComponent)
-            )
+        guard let documentBrowser = activeDocumentBrowser else {
+            throw renameError(L10n.string("document.error.rename_unavailable"))
         }
 
-        let didAccessSecurityScopedResource = sourceURL.startAccessingSecurityScopedResource()
-        defer {
-            if didAccessSecurityScopedResource {
-                sourceURL.stopAccessingSecurityScopedResource()
+        return try await withCheckedThrowingContinuation { continuation in
+            // UIDocumentBrowserViewController performs the rename through the
+            // document provider, so the destination does not require a new
+            // sandbox extension owned by this process.
+            documentBrowser.renameDocument(
+                at: sourceURL,
+                proposedName: baseName
+            ) { finalURL, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                } else if let finalURL {
+                    continuation.resume(returning: finalURL)
+                } else {
+                    continuation.resume(
+                        throwing: renameError(
+                            L10n.string("document.error.rename_unavailable")
+                        )
+                    )
+                }
             }
         }
-
-        let coordinator = NSFileCoordinator()
-        var coordinationError: NSError?
-        var moveError: (any Error)?
-        coordinator.coordinate(
-            writingItemAt: sourceURL,
-            options: .forMoving,
-            writingItemAt: destinationURL,
-            options: .forReplacing,
-            error: &coordinationError
-        ) { coordinatedSourceURL, coordinatedDestinationURL in
-            do {
-                try FileManager.default.moveItem(
-                    at: coordinatedSourceURL,
-                    to: coordinatedDestinationURL
-                )
-                coordinator.item(
-                    at: coordinatedSourceURL,
-                    didMoveTo: coordinatedDestinationURL
-                )
-            } catch {
-                moveError = error
-            }
-        }
-
-        if let error = moveError ?? coordinationError {
-            throw error
-        }
-        return destinationURL
     }
 
-    nonisolated private static func removingExtension(
+    private static var activeDocumentBrowser: UIDocumentBrowserViewController? {
+        documentBrowser(in: AppPresentationAnchor.rootViewController)
+    }
+
+    static func documentBrowser(
+        in controller: UIViewController?
+    ) -> UIDocumentBrowserViewController? {
+        guard let controller else { return nil }
+
+        if let browser = controller as? UIDocumentBrowserViewController {
+            return browser
+        }
+        if let documentController = controller as? UIDocumentViewController {
+            return documentController.launchOptions.browserViewController
+        }
+        if let browser = documentBrowser(in: controller.presentedViewController) {
+            return browser
+        }
+        for child in controller.children {
+            if let browser = documentBrowser(in: child) {
+                return browser
+            }
+        }
+        return nil
+    }
+
+    private static func removingExtension(
         _ pathExtension: String,
         from proposedName: String
     ) -> String {
@@ -76,7 +82,7 @@ enum DocumentRenamer {
         return String(proposedName.dropLast(pathExtension.count + 1))
     }
 
-    nonisolated private static func renameError(_ message: String) -> NSError {
+    private static func renameError(_ message: String) -> NSError {
         NSError(
             domain: "com.fze.margin.rename",
             code: 1,

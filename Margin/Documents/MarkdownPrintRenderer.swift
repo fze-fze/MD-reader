@@ -84,6 +84,10 @@ enum MarkdownPrintRenderer {
             }
             let caption = alt.isEmpty ? "" : "<figcaption>\(inline(alt))</figcaption>"
             return "<figure><img src=\"\(escapeAttribute(resolvedSource))\" alt=\"\(escapeAttribute(alt))\">\(caption)</figure>"
+        case let .math(source):
+            // Print output has no native math typesetting; emit the raw LaTeX
+            // between its delimiters so the formula survives on paper.
+            return "<pre class=\"math\">$$\(escape(source))$$</pre>"
         case let .frontMatter(source):
             return "<div class=\"front-matter\">\(escape(source))</div>"
         case .divider:

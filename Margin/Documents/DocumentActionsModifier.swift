@@ -73,7 +73,8 @@ struct DocumentActionsModifier: ViewModifier {
             isMovePresented = true
         case .rename:
             guard fileURL != nil, !isRenaming else { return }
-            presentRenameDialog()
+            proposedName = displayName
+            isRenamePresented = true
         case .share:
             shareDocument()
         case .print:
@@ -98,25 +99,22 @@ struct DocumentActionsModifier: ViewModifier {
         }
     }
 
-    private func presentRenameDialog() {
-        proposedName = displayName
-        isRenamePresented = true
-    }
-
     private func renameDocument() {
         guard let fileURL else { return }
-        let requestedName = proposedName
         isRenaming = true
-        Task {
+        Task { @MainActor in
             do {
-                _ = try await Task.detached(priority: .userInitiated) {
-                    try DocumentRenamer.rename(fileAt: fileURL, to: requestedName)
-                }.value
-                isRenaming = false
+                // Let the name-entry alert finish dismissing before the
+                // document browser presents any provider conflict UI.
+                try await Task.sleep(for: .milliseconds(250))
+                _ = try await DocumentRenamer.rename(
+                    fileAt: fileURL,
+                    to: proposedName
+                )
             } catch {
-                isRenaming = false
                 actionError = .rename(error)
             }
+            isRenaming = false
         }
     }
 }

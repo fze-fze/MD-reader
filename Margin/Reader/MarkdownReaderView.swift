@@ -97,6 +97,7 @@ private struct MarkdownBlockView: View {
             InlineMarkdownText(
                 source: text,
                 fonts: inlineFonts(size: bodySize),
+                mathFontSize: bodySize,
                 foregroundStyle: theme.textPrimary,
                 theme: theme,
                 searchText: searchText,
@@ -115,6 +116,14 @@ private struct MarkdownBlockView: View {
             taskList(items)
         case let .code(language, source):
             codeBlock(language: language, source: source)
+        case let .math(source):
+            MathBlockView(
+                source: source,
+                bodySize: bodySize,
+                theme: theme,
+                searchText: searchText,
+                activeOccurrenceIndex: activeOccurrenceIndex
+            )
         case let .table(headers, rows):
             table(headers: headers, rows: rows)
         case let .image(alt, source):
@@ -133,6 +142,7 @@ private struct MarkdownBlockView: View {
         return InlineMarkdownText(
             source: text,
             fonts: inlineFonts(size: bodySize * multiplier, weight: .semibold),
+            mathFontSize: bodySize * multiplier,
             foregroundStyle: level == 6 ? theme.textSecondary : theme.textStrong,
             theme: theme,
             searchText: searchText,
@@ -152,6 +162,7 @@ private struct MarkdownBlockView: View {
             InlineMarkdownText(
                 source: text,
                 fonts: inlineFonts(size: bodySize),
+                mathFontSize: bodySize,
                 foregroundStyle: theme.quoteText,
                 theme: theme,
                 searchText: searchText,
@@ -179,6 +190,7 @@ private struct MarkdownBlockView: View {
                     InlineMarkdownText(
                         source: item.text,
                         fonts: inlineFonts(size: bodySize),
+                        mathFontSize: bodySize,
                         foregroundStyle: theme.textPrimary,
                         theme: theme,
                         searchText: searchText,
@@ -232,6 +244,7 @@ private struct MarkdownBlockView: View {
                     InlineMarkdownText(
                         source: item.text,
                         fonts: inlineFonts(size: bodySize),
+                        mathFontSize: bodySize,
                         foregroundStyle: theme.textPrimary,
                         theme: theme,
                         searchText: searchText,
@@ -292,6 +305,7 @@ private struct MarkdownBlockView: View {
                         InlineMarkdownText(
                             source: value,
                             fonts: inlineFonts(size: bodySize * 0.93, weight: .semibold),
+                            mathFontSize: bodySize * 0.93,
                             foregroundStyle: theme.textStrong,
                             theme: theme,
                             searchText: searchText,
@@ -308,6 +322,7 @@ private struct MarkdownBlockView: View {
                             InlineMarkdownText(
                                 source: value,
                                 fonts: inlineFonts(size: bodySize * 0.93),
+                                mathFontSize: bodySize * 0.93,
                                 foregroundStyle: theme.textPrimary,
                                 theme: theme,
                                 searchText: searchText,
@@ -445,6 +460,56 @@ private struct MarkdownBlockView: View {
         guard fragmentIndex > 0 else { return 0 }
         return block.searchableFragments.prefix(fragmentIndex).reduce(into: 0) { count, fragment in
             count += DocumentSearchMatcher.ranges(in: fragment, query: searchText).count
+        }
+    }
+}
+
+private struct MathBlockView: View {
+    let source: String
+    let bodySize: Double
+    let theme: MarkdownTheme
+    let searchText: String
+    let activeOccurrenceIndex: Int?
+
+    var body: some View {
+        if let formula = MathRenderer.formula(
+            latex: source,
+            fontSize: bodySize * 1.12,
+            textColor: UIColor(theme.textPrimary),
+            display: true,
+            readerTheme: theme.readerTheme
+        ) {
+            ViewThatFits(in: .horizontal) {
+                Image(uiImage: formula.image)
+                ScrollView(.horizontal) {
+                    Image(uiImage: formula.image)
+                }
+                .scrollIndicators(.hidden)
+            }
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding(.vertical, bodySize * 0.55)
+            .accessibilityLabel(L10n.format("reader.math_accessibility", source))
+        } else {
+            // Invalid LaTeX: show the raw source in code styling so the
+            // document still reads and search highlighting keeps working.
+            SearchablePlainText(
+                source: source,
+                font: .system(size: bodySize * 0.9, design: theme.codeFont),
+                foregroundStyle: theme.codeText,
+                theme: theme,
+                searchText: searchText,
+                activeOccurrenceIndex: activeOccurrenceIndex,
+                occurrenceOffset: 0
+            )
+            .lineSpacing(bodySize * 0.39)
+            .textSelection(.enabled)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(theme.codeFill, in: RoundedRectangle(cornerRadius: 8))
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(theme.codeBorder))
+            .padding(.vertical, bodySize * 0.39)
+            .accessibilityLabel(L10n.format("reader.math_accessibility", source))
         }
     }
 }

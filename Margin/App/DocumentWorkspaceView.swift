@@ -81,7 +81,8 @@ struct DocumentWorkspaceView: View {
                 onOutline: presentOutline,
                 onDocumentInfo: presentDocumentInfo,
                 onDocumentAction: requestDocumentAction,
-                canMoveOrRename: fileURL != nil
+                canMove: fileURL != nil,
+                canRename: fileURL != nil
             )
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {

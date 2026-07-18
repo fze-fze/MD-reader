@@ -12,6 +12,7 @@ nonisolated struct MarkdownBlock: Identifiable, Equatable, Sendable {
         case orderedList([MarkdownListItem])
         case taskList([MarkdownListItem])
         case code(language: String?, source: String)
+        case math(source: String)
         case table(headers: [String], rows: [[String]])
         case image(alt: String, source: String)
         case frontMatter(String)
@@ -30,7 +31,7 @@ nonisolated struct MarkdownBlock: Identifiable, Equatable, Sendable {
             [text]
         case let .unorderedList(items), let .orderedList(items), let .taskList(items):
             items.map { Self.inlinePlainText($0.text) }
-        case let .code(_, source):
+        case let .code(_, source), let .math(source):
             [source]
         case let .table(headers, rows):
             (headers + rows.flatMap { $0 }).map(Self.inlinePlainText)
@@ -41,7 +42,22 @@ nonisolated struct MarkdownBlock: Identifiable, Equatable, Sendable {
         }
     }
 
+    // Inline math renders as an image, so searchable text replaces each
+    // formula with U+FFFC. The placeholder blocks queries from matching
+    // across a formula seam, keeping index match counts aligned with the
+    // per-segment highlighting the reader can actually draw.
     private static func inlinePlainText(_ source: String) -> String {
+        InlineMathSegmenter.segments(in: source).map { segment in
+            switch segment {
+            case let .text(part):
+                plainMarkdownText(part)
+            case .math:
+                "\u{FFFC}"
+            }
+        }.joined()
+    }
+
+    private static func plainMarkdownText(_ source: String) -> String {
         guard let attributed = try? AttributedString(
             markdown: source,
             options: AttributedString.MarkdownParsingOptions(

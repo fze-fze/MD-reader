@@ -48,6 +48,14 @@ Inline markdown (`**bold**`, `` `code` ``, links) is *not* parsed by `MarkdownPa
 
 Parsing and search indexing run off the main actor via `Task.detached` in `MarkdownReaderView.task(id: source)`; the model types are `nonisolated` + `Sendable` for this reason.
 
+### Math (LaTeX)
+
+Display math (`$$…$$` fences or `\[…\]`) parses to `MarkdownBlock.Kind.math`; an unterminated opener stays a paragraph. Inline math (`$…$`, `\(…\)`, `$$…$$` inside a sentence) is split out by `InlineMathSegmenter` — inline code spans and `\$` escapes win over `$`, and a `$` span needs non-space-adjacent delimiters with no digit after the closer (so “$5 和 $10” stays text).
+
+Rendering is native via the **SwiftMath** SPM package (the project's only dependency) in `MathRenderer` (`@MainActor`), which caches by theme/size/color/latex and returns the baseline **descent** so inline formulas sit on the surrounding text baseline (`Text(Image).baselineOffset(-descent)`). Claude theme uses the Termes math font, GitHub uses Latin Modern. Invalid LaTeX falls back to raw source (code styling at block level; `$…$` literal inline).
+
+Search: inline math becomes U+FFFC in `searchableFragments` so index match counts stay aligned with per-segment highlighting; block math is searchable by its raw LaTeX. Print output emits raw LaTeX between `$$` (no math typesetting in the print HTML).
+
 ### Search
 
 `DocumentSearchIndex` is built from each block's `searchableFragments` (markdown syntax stripped, so `**` never matches). A `Match` is `(blockID, occurrenceIndex)` where `occurrenceIndex` counts occurrences *within the block*, across its fragments in order. Views then re-derive an `occurrenceOffset` per fragment (list item / table cell) so the "active" match can be highlighted in the right cell — fragment order in `searchableFragments` must stay in lockstep with render order in `MarkdownBlockView`.

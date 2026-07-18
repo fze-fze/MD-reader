@@ -40,6 +40,12 @@ nonisolated enum MarkdownParser {
                 continue
             }
 
+            if let math = mathBlock(at: index, lines: lines) {
+                blocks.append(MarkdownBlock(id: index, kind: .math(source: math.source)))
+                index = math.nextIndex
+                continue
+            }
+
             if let heading = heading(from: trimmed) {
                 blocks.append(MarkdownBlock(id: index, kind: .heading(level: heading.level, text: heading.text)))
                 index += 1
@@ -108,6 +114,7 @@ nonisolated enum MarkdownParser {
                       image(from: candidate) == nil,
                       listItem(from: candidate) == nil else { break }
                 if index != start, table(at: index, lines: lines) != nil { break }
+                if index != start, mathBlock(at: index, lines: lines) != nil { break }
                 paragraph.append(candidate)
                 index += 1
             }
@@ -130,6 +137,61 @@ nonisolated enum MarkdownParser {
         let hashes = line.prefix(while: { $0 == "#" }).count
         guard (1...6).contains(hashes), line.dropFirst(hashes).first == " " else { return nil }
         return (hashes, String(line.dropFirst(hashes + 1)))
+    }
+
+    // Display math: $$…$$ on one line, a $$ fence over several lines, or the
+    // \[…\] equivalents. An unterminated opener is not treated as math so a
+    // stray $$ cannot swallow the rest of the document.
+    private static func mathBlock(at index: Int, lines: [String]) -> (source: String, nextIndex: Int)? {
+        let trimmed = lines[index].trimmingCharacters(in: .whitespaces)
+        if trimmed.hasPrefix("$$") {
+            return fencedMath(at: index, lines: lines, opening: "$$", closing: "$$")
+        }
+        if trimmed.hasPrefix("\\[") {
+            return fencedMath(at: index, lines: lines, opening: "\\[", closing: "\\]")
+        }
+        return nil
+    }
+
+    private static func fencedMath(
+        at index: Int,
+        lines: [String],
+        opening: String,
+        closing: String
+    ) -> (source: String, nextIndex: Int)? {
+        let trimmed = lines[index].trimmingCharacters(in: .whitespaces)
+        let afterOpening = String(trimmed.dropFirst(opening.count))
+
+        if afterOpening.hasSuffix(closing), afterOpening.count >= closing.count {
+            let inner = String(afterOpening.dropLast(closing.count))
+                .trimmingCharacters(in: .whitespaces)
+            return inner.isEmpty ? nil : (inner, index + 1)
+        }
+
+        var contentLines: [String] = []
+        let openingRest = afterOpening.trimmingCharacters(in: .whitespaces)
+        if !openingRest.isEmpty { contentLines.append(openingRest) }
+
+        var next = index + 1
+        while next < lines.count {
+            let candidate = lines[next].trimmingCharacters(in: .whitespaces)
+            if candidate == closing {
+                let source = contentLines.joined(separator: "\n")
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                return source.isEmpty ? nil : (source, next + 1)
+            }
+            if candidate.hasSuffix(closing) {
+                contentLines.append(
+                    String(candidate.dropLast(closing.count)).trimmingCharacters(in: .whitespaces)
+                )
+                let source = contentLines.joined(separator: "\n")
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                return source.isEmpty ? nil : (source, next + 1)
+            }
+            contentLines.append(lines[next])
+            next += 1
+        }
+        return nil
     }
 
     private static func isDivider(_ line: String) -> Bool {

@@ -167,6 +167,110 @@ struct MarkdownParserTests {
         #expect(session.matches.isEmpty)
     }
 
+    @Test func parsesDisplayMathBlocks() {
+        let source = """
+        # 公式
+
+        $$
+        E = mc^2
+        $$
+
+        中间段落
+
+        $$\\sum_{i=1}^n i$$
+
+        \\[
+        \\frac{1}{2}
+        \\]
+        """
+
+        let blocks = MarkdownParser.parse(source)
+        let mathBlocks = blocks.compactMap { block -> (id: Int, source: String)? in
+            guard case let .math(source) = block.kind else { return nil }
+            return (block.id, source)
+        }
+
+        #expect(mathBlocks.count == 3)
+        #expect(mathBlocks[0] == (2, "E = mc^2"))
+        #expect(mathBlocks[1].source == "\\sum_{i=1}^n i")
+        #expect(mathBlocks[2].source == "\\frac{1}{2}")
+        #expect(blocks.contains { if case .paragraph("中间段落") = $0.kind { true } else { false } })
+        // Math blocks are searchable by their raw LaTeX source.
+        #expect(mathBlocks[0].id == 2)
+        let firstMath = blocks.first { $0.id == 2 }
+        #expect(firstMath?.searchableFragments == ["E = mc^2"])
+    }
+
+    @Test func leavesUnterminatedDisplayMathAsParagraph() {
+        let blocks = MarkdownParser.parse("$$\n没有闭合的公式")
+        #expect(!blocks.contains { if case .math = $0.kind { true } else { false } })
+    }
+
+    @Test func segmentsInlineMathWithHeuristics() {
+        #expect(InlineMathSegmenter.segments(in: "质能关系 $E=mc^2$ 成立") == [
+            .text("质能关系 "),
+            .math(latex: "E=mc^2", isDisplay: false),
+            .text(" 成立")
+        ])
+        #expect(InlineMathSegmenter.segments(in: "价格 $5 和 $10 都可以") == [
+            .text("价格 $5 和 $10 都可以")
+        ])
+        #expect(InlineMathSegmenter.segments(in: "转义 \\$5 不是公式") == [
+            .text("转义 \\$5 不是公式")
+        ])
+        #expect(InlineMathSegmenter.segments(in: "`code $x$` 之外 $y$") == [
+            .text("`code $x$` 之外 "),
+            .math(latex: "y", isDisplay: false)
+        ])
+        #expect(InlineMathSegmenter.segments(in: "括号式 \\(a+b\\) 行内") == [
+            .text("括号式 "),
+            .math(latex: "a+b", isDisplay: false),
+            .text(" 行内")
+        ])
+        #expect(InlineMathSegmenter.segments(in: "展示式 $$\\int_0^1 x$$ 嵌入") == [
+            .text("展示式 "),
+            .math(latex: "\\int_0^1 x", isDisplay: true),
+            .text(" 嵌入")
+        ])
+    }
+
+    @Test func replacesInlineMathWithPlaceholderInSearchableFragments() {
+        let blocks = MarkdownParser.parse("alpha $x^2$ beta")
+        #expect(blocks.count == 1)
+        #expect(blocks[0].searchableFragments == ["alpha \u{FFFC} beta"])
+    }
+
+    @Test @MainActor func rendersCommonLatexFormulas() {
+        let formula = MathRenderer.formula(
+            latex: "\\frac{a}{b} + \\sqrt{x^2} = \\sum_{i=1}^{n} i",
+            fontSize: 17,
+            textColor: .black,
+            display: true,
+            readerTheme: .claude
+        )
+        #expect(formula != nil)
+        #expect((formula?.image.size.width ?? 0) > 0)
+        #expect((formula?.image.size.height ?? 0) > 0)
+
+        let subscripted = MathRenderer.formula(
+            latex: "x_{i}",
+            fontSize: 17,
+            textColor: .black,
+            display: false,
+            readerTheme: .claude
+        )
+        #expect((subscripted?.descent ?? 0) > 0)
+
+        let invalid = MathRenderer.formula(
+            latex: "\\notarealcommand{x}",
+            fontSize: 17,
+            textColor: .black,
+            display: true,
+            readerTheme: .claude
+        )
+        #expect(invalid == nil)
+    }
+
     @Test func computesMinimalEditorTextReplacements() {
         let cases: [(old: String, new: String)] = [
             ("Line one\nLine two", "Line one\n**Line** two"),
@@ -244,28 +348,19 @@ struct MarkdownParserTests {
             "# Current\n\nLatest contents.")
     }
 
-    @Test func renamesMarkdownDocumentsWithoutChangingTheirExtension() throws {
-        let folderURL = FileManager.default.temporaryDirectory
-            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
-        try FileManager.default.createDirectory(at: folderURL, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: folderURL) }
+    @Test @MainActor func findsDocumentBrowserUsedByDocumentViewController() {
+        let rootController = UIViewController()
+        let documentController = UIDocumentViewController(document: nil)
+        rootController.addChild(documentController)
+        documentController.didMove(toParent: rootController)
 
-        let sourceURL = folderURL.appending(path: "Old.md")
-        try "# Test".write(to: sourceURL, atomically: true, encoding: .utf8)
-        let presenter = RecordingFilePresenter(url: sourceURL)
-        NSFileCoordinator.addFilePresenter(presenter)
-        defer { NSFileCoordinator.removeFilePresenter(presenter) }
-
-        let renamedURL = try DocumentRenamer.rename(fileAt: sourceURL, to: "New.md")
-
-        #expect(renamedURL.lastPathComponent == "New.md")
-        #expect(!FileManager.default.fileExists(atPath: sourceURL.path()))
-        #expect(try String(contentsOf: renamedURL, encoding: .utf8) == "# Test")
-        #expect(presenter.waitForMove(timeout: 2))
-        #expect(presenter.presentedItemURL == renamedURL)
+        #expect(
+            DocumentRenamer.documentBrowser(in: rootController) ===
+                documentController.launchOptions.browserViewController
+        )
     }
 
-    @Test func validatesDocumentNamesBeforeRenaming() {
+    @Test @MainActor func validatesDocumentNamesBeforeRenaming() {
         #expect(DocumentRenamer.isValidName("Notes"))
         #expect(!DocumentRenamer.isValidName("   "))
         #expect(!DocumentRenamer.isValidName("Folder/Notes"))

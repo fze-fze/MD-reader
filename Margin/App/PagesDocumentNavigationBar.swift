@@ -11,7 +11,8 @@ struct PagesDocumentNavigationBar: View {
     let onOutline: () -> Void
     let onDocumentInfo: () -> Void
     let onDocumentAction: (DocumentActionRequest) -> Void
-    let canMoveOrRename: Bool
+    let canMove: Bool
+    let canRename: Bool
 
     var body: some View {
         GlassEffectContainer(spacing: 12) {
@@ -41,7 +42,8 @@ struct PagesDocumentNavigationBar: View {
                     onOutline: onOutline,
                     onDocumentInfo: onDocumentInfo,
                     onDocumentAction: onDocumentAction,
-                    canMoveOrRename: canMoveOrRename
+                    canMove: canMove,
+                    canRename: canRename
                 )
             }
         }
