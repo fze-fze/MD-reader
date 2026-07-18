@@ -3,7 +3,7 @@ import UIKit
 
 @MainActor
 enum DocumentPrinter {
-    static func present(text: String, title: String, baseURL: URL? = nil) {
+    static func present(text: String, title: String, theme: ReaderTheme, baseURL: URL? = nil) {
         let controller = UIPrintInteractionController.shared
         let printInfo = UIPrintInfo(dictionary: nil)
         printInfo.jobName = title
@@ -15,6 +15,7 @@ enum DocumentPrinter {
             markupText: MarkdownPrintRenderer.html(
                 source: text,
                 title: title,
+                theme: theme,
                 baseURL: baseURL
             )
         )

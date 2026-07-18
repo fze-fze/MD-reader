@@ -7,7 +7,8 @@ struct MarkdownAccessoryBar: View {
     @Environment(\.colorScheme) private var colorScheme
 
     private let inlineActions: [MarkdownEditAction] = [.bold, .italic, .link, .code, .inlineMath]
-    private let blockActions: [MarkdownEditAction] = [.list, .task, .quote, .mathBlock]
+    // mathBlock leads so it sits right beside inlineMath across the divider.
+    private let blockActions: [MarkdownEditAction] = [.mathBlock, .list, .task, .quote]
 
     var body: some View {
         ScrollView(.horizontal) {

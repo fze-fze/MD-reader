@@ -6,6 +6,8 @@ struct DocumentActionsModifier: ViewModifier {
     let displayName: String
     @Binding var requestedAction: DocumentActionRequest?
 
+    @AppStorage("readerTheme") private var readerTheme = ReaderTheme.claude
+
     @State private var isCopyPresented = false
     @State private var isMovePresented = false
     @State private var isRenamePresented = false
@@ -81,6 +83,7 @@ struct DocumentActionsModifier: ViewModifier {
             DocumentPrinter.present(
                 text: text,
                 title: displayName,
+                theme: readerTheme,
                 baseURL: fileURL?.deletingLastPathComponent()
             )
         }

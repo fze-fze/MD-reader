@@ -54,7 +54,7 @@ Delimiters are `$` only, by design: display math is a standalone `$$…$$` line 
 
 Rendering is native via the **SwiftMath** SPM package (the project's only dependency) in `MathRenderer` (`@MainActor`), which caches by theme/size/color/latex and returns the baseline **descent** so inline formulas sit on the surrounding text baseline (`Text(Image).baselineOffset(-descent)`). `MathRenderer.normalizedLatex` rewrites common commands SwiftMath lacks (`\lVert`/`\rVert`, `\dfrac`, `\operatorname`, `\implies`, …) into supported equivalents before parsing — one unknown command otherwise fails the whole formula; extend `commandAliases` when users hit new ones. Claude theme uses the Termes math font, GitHub uses Latin Modern. Invalid LaTeX falls back to raw source (code styling at block level; `$…$` literal inline).
 
-Search: inline math becomes U+FFFC in `searchableFragments` so index match counts stay aligned with per-segment highlighting; block math is searchable by its raw LaTeX. Print output emits raw LaTeX between `$$` (no math typesetting in the print HTML).
+Search: inline math becomes U+FFFC in `searchableFragments` so index match counts stay aligned with per-segment highlighting; block math is searchable by its raw LaTeX. Print embeds formulas as base64 `<img>` data URIs (`MarkdownPrintRenderer.mathImageTag`, sized in `pt`, inline images baseline-shifted by the descent); invalid LaTeX prints as raw `$$…$$`.
 
 ### Search
 
@@ -84,7 +84,7 @@ Persistence is three `@AppStorage` keys, declared in `DocumentWorkspaceView`: `r
 
 ### Printing
 
-`DocumentPrinter` → `MarkdownPrintRenderer.html(source:title:)` produces standalone styled HTML (escaping is hand-rolled and tested) → `UIPrintInteractionController`.
+`DocumentPrinter` → `MarkdownPrintRenderer.html(source:title:theme:)` produces standalone styled HTML (escaping is hand-rolled and tested) → `UIPrintInteractionController`. The HTML follows the current `ReaderTheme` — per-theme `Palette` drives fonts, colors, and heading scale, and math images render with the theme's math font; print always uses the light palette.
 
 ## Tests
 

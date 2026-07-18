@@ -534,6 +534,50 @@ struct MarkdownParserTests {
         return try String(contentsOf: url, encoding: .utf8)
     }
 
+    @Test func printRendererMatchesReaderForMathAndTasks() {
+        let source = """
+        行内 $E=mc^2$ 公式
+
+        $$
+        \\frac{a}{b}
+        $$
+
+        - [x] 已完成
+        - [ ] 未完成
+
+        $$\\notarealcommand{x}$$
+        """
+
+        let html = MarkdownPrintRenderer.html(source: source, title: "Math", theme: .claude)
+
+        #expect(html.contains("<img class=\"inline-math\""))
+        #expect(html.contains("<img class=\"math\""))
+        #expect(html.contains("data:image/png;base64,"))
+        #expect(html.contains("vertical-align:-"))
+        // Task lists suppress the default bullet and draw the reader's
+        // SF Symbol checkboxes as embedded images.
+        #expect(html.contains("<ul class=\"task-list\">"))
+        #expect(html.contains("<img class=\"task-marker\""))
+        #expect(!html.contains("<span class=\"task-marker\">"))
+        // Invalid LaTeX falls back to raw source between $$.
+        #expect(html.contains("<pre class=\"math\">$$\\notarealcommand{x}$$</pre>"))
+    }
+
+    @Test func printRendererFollowsReaderTheme() {
+        let source = "# Heading\n\n正文 $E=mc^2$ 内容"
+
+        let claude = MarkdownPrintRenderer.html(source: source, title: "T", theme: .claude)
+        let github = MarkdownPrintRenderer.html(source: source, title: "T", theme: .github)
+
+        #expect(claude.contains("ui-serif"))
+        #expect(claude.contains("#9d552d"))
+        #expect(github.contains("-apple-system"))
+        #expect(github.contains("#4183c4"))
+        #expect(!github.contains("ui-serif"))
+        // Math images are theme-specific renders, not shared bitmaps.
+        #expect(claude != github)
+    }
+
     @Test func printRendererProducesStyledHTMLAndEscapesContent() {
         let source = """
         # Heading
@@ -551,7 +595,7 @@ struct MarkdownParserTests {
         let value = 1 < 2
         ```
         """
-        let html = MarkdownPrintRenderer.html(source: source, title: "Test & Print")
+        let html = MarkdownPrintRenderer.html(source: source, title: "Test & Print", theme: .claude)
 
         #expect(html.contains("<h1>Heading</h1>"))
         #expect(html.contains("<strong>bold</strong>"))
