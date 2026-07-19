@@ -35,7 +35,8 @@ The project uses **file-system-synchronized groups** (`PBXFileSystemSynchronized
 ### Document operations
 
 - `MarkdownDocument` is the sole open-document model and is also reused by `fileExporter` for "save a copy".
-- `DocumentRenamer` coordinates a move with `NSFileCoordinator` and reports it with `item(at:didMoveTo:)`, allowing the `DocumentGroup` file presenter to follow the new URL.
+- `DocumentRenamer` renames through `UIDocumentBrowserViewController.renameDocument` (found via `AppPresentationAnchor` traversal) because the app lacks parent-directory permission for provider-owned files. The document stays open: the coordinated move keeps DocumentGroup's internal presenter (autosave) on track, but the published `fileURL` stays stale until reopen, so `DocumentWorkspaceView` tracks the post-rename URL in `renamedFileURL` and derives name/actions from it.
+- Like Pages, the navigation bar shows no title text: the toolbar's document icon opens the document menu (`PagesWorkspaceToolbar.documentMenu`) whose topmost section header is the file name, above outline/info and the file actions.
 - `DocumentWorkspaceView` must continue to receive `file.$document.text` rather than copying it into independent state.
 
 ### Reader pipeline and the block-ID invariant
@@ -62,7 +63,7 @@ Search: inline math becomes U+FFFC in `searchableFragments` so index match count
 
 `DocumentSearchMatcher` is the single matching primitive (case-, diacritic-, width-insensitive).
 
-Search UI is an on-demand bottom `DocumentSearchBar` presented from the toolbar magnifier through a stable `safeAreaInset`; do not attach `.searchable` to the document workspace because the navigation drawer becomes permanently visible and can recreate the reader. `DocumentSearchSession` owns the debounced query, result count, current match, and navigation. Typing updates highlights and the count without moving the document; Return or the arrow buttons navigate results, and only matching blocks receive the effective query.
+Search UI is an on-demand bottom `DocumentSearchBar` presented from the toolbar magnifier (in edit mode the same magnifier presents `UITextView`'s system find panel via a `findTrigger` counter instead) through a stable `safeAreaInset`; do not attach `.searchable` to the document workspace because the navigation drawer becomes permanently visible and can recreate the reader. `DocumentSearchSession` owns the debounced query, result count, current match, and navigation. Typing updates highlights and the count without moving the document; Return or the arrow buttons navigate results, and only matching blocks receive the effective query.
 
 ### Theming
 

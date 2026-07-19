@@ -14,7 +14,13 @@ struct DocumentWorkspaceView: View {
     @State private var isSearchPresented = false
     @State private var scrollTarget: Int?
     @State private var isEditorFocused = false
+    @State private var editorFindTrigger = 0
     @State private var requestedDocumentAction: DocumentActionRequest?
+    // The URL after an in-app rename. DocumentGroup's published fileURL keeps
+    // the pre-rename value until the document is reopened, while its internal
+    // file presenter follows the coordinated move — so the document stays
+    // open and only our URL-derived UI needs the override.
+    @State private var renamedFileURL: URL?
 
     @Environment(\.colorScheme) private var systemColorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -30,8 +36,13 @@ struct DocumentWorkspaceView: View {
         appearance.colorScheme ?? systemColorScheme
     }
 
+    private var effectiveFileURL: URL? {
+        renamedFileURL ?? fileURL
+    }
+
     private var displayName: String {
-        fileURL?.deletingPathExtension().lastPathComponent ?? L10n.string("workspace.untitled")
+        effectiveFileURL?.deletingPathExtension().lastPathComponent
+            ?? L10n.string("workspace.untitled")
     }
 
     private var theme: MarkdownTheme {
@@ -48,7 +59,7 @@ struct DocumentWorkspaceView: View {
                 searchSession: searchSession,
                 scrollTarget: $scrollTarget,
                 textScale: textScale,
-                baseURL: fileURL?.deletingLastPathComponent(),
+                baseURL: effectiveFileURL?.deletingLastPathComponent(),
                 readerTheme: readerTheme,
                 onToggleTask: toggleTask
             )
@@ -61,6 +72,7 @@ struct DocumentWorkspaceView: View {
                     text: $text,
                     textScale: textScale,
                     isFocused: $isEditorFocused,
+                    findTrigger: editorFindTrigger,
                     readerTheme: readerTheme
                 )
                     .transition(.opacity)
@@ -72,8 +84,8 @@ struct DocumentWorkspaceView: View {
         .safeAreaInset(edge: .top, spacing: 0) {
             PagesDocumentNavigationBar(
                 mode: mode,
+                documentName: displayName,
                 theme: theme,
-                canUseReaderTools: mode == .read,
                 onDismiss: dismissWorkspace,
                 onSearch: presentSearch,
                 onToggleMode: toggleWorkspaceMode,
@@ -81,8 +93,8 @@ struct DocumentWorkspaceView: View {
                 onOutline: presentOutline,
                 onDocumentInfo: presentDocumentInfo,
                 onDocumentAction: requestDocumentAction,
-                canMove: fileURL != nil,
-                canRename: fileURL != nil
+                canMove: effectiveFileURL != nil,
+                canRename: effectiveFileURL != nil
             )
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -102,9 +114,10 @@ struct DocumentWorkspaceView: View {
         .modifier(
             DocumentActionsModifier(
                 text: text,
-                fileURL: fileURL,
+                fileURL: effectiveFileURL,
                 displayName: displayName,
-                requestedAction: $requestedDocumentAction
+                requestedAction: $requestedDocumentAction,
+                onRenamed: { renamedFileURL = $0 }
             )
         )
         .onAppear {
@@ -173,9 +186,15 @@ struct DocumentWorkspaceView: View {
         mode = .read
     }
 
+    // In reading mode the magnifier opens the document search bar; in edit
+    // mode it presents UITextView's system find panel instead.
     private func presentSearch() {
-        searchSession.activate()
-        isSearchPresented = true
+        if mode == .edit {
+            editorFindTrigger &+= 1
+        } else {
+            searchSession.activate()
+            isSearchPresented = true
+        }
     }
 
     private func dismissSearch() {
@@ -211,7 +230,7 @@ struct DocumentWorkspaceView: View {
             )
         case .info:
             DocumentInfoView(
-                fileURL: fileURL,
+                fileURL: effectiveFileURL,
                 statistics: DocumentStatistics(source: text)
             )
         }

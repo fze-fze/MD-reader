@@ -2,8 +2,8 @@ import SwiftUI
 
 struct PagesDocumentNavigationBar: View {
     let mode: WorkspaceMode
+    let documentName: String
     let theme: MarkdownTheme
-    let canUseReaderTools: Bool
     let onDismiss: () -> Void
     let onSearch: () -> Void
     let onToggleMode: () -> Void
@@ -33,9 +33,9 @@ struct PagesDocumentNavigationBar: View {
 
                 PagesWorkspaceToolbar(
                     mode: mode,
+                    documentName: documentName,
                     accent: theme.accent,
                     glassTint: theme.navigationGlassTint,
-                    canUseReaderTools: canUseReaderTools,
                     onSearch: onSearch,
                     onToggleMode: onToggleMode,
                     onSettings: onSettings,

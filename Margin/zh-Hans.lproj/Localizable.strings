@@ -15,6 +15,7 @@
 "workspace.outline" = "目录";
 "workspace.reader_settings" = "阅读设置";
 "workspace.document_info" = "文档信息";
+"workspace.document_menu_accessibility" = "文稿菜单：%@";
 "workspace.search_prompt" = "在文档中查找";
 
 "appearance.system" = "跟随系统";
@@ -54,7 +55,6 @@
 "document.copy_filename" = "%@ 副本";
 "document.rename" = "重新命名";
 "document.name_field" = "文稿名称";
-"document.extension_unchanged" = "文件扩展名会保持不变。";
 "document.copy" = "复制";
 "document.move" = "移动";
 "document.share" = "分享";

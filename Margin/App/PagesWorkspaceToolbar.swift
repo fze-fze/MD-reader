@@ -2,9 +2,9 @@ import SwiftUI
 
 struct PagesWorkspaceToolbar: View {
     let mode: WorkspaceMode
+    let documentName: String
     let accent: Color
     let glassTint: Color
-    let canUseReaderTools: Bool
     let onSearch: () -> Void
     let onToggleMode: () -> Void
     let onSettings: () -> Void
@@ -25,7 +25,6 @@ struct PagesWorkspaceToolbar: View {
                     .contentShape(.rect)
             }
             .keyboardShortcut("f", modifiers: .command)
-            .disabled(!canUseReaderTools)
 
             Button(action: onToggleMode) {
                 Label(
@@ -57,9 +56,12 @@ struct PagesWorkspaceToolbar: View {
         )
     }
 
+    // Pages-style document menu: an icon button in the bar; the file name
+    // lives inside the menu as its topmost header, so the bar itself never
+    // shows a (potentially stale) title.
     private var documentMenu: some View {
         Menu {
-            Section {
+            Section(documentName) {
                 Button("workspace.outline", systemImage: "list.bullet.indent", action: onOutline)
                 Button("workspace.document_info", systemImage: "info.circle", action: onDocumentInfo)
             }
@@ -87,9 +89,10 @@ struct PagesWorkspaceToolbar: View {
                 }
             }
         } label: {
-            Label("workspace.more", systemImage: "ellipsis")
+            Label("workspace.more", systemImage: "doc.text")
                 .frame(width: 44, height: 44)
                 .contentShape(.rect)
         }
+        .accessibilityLabel(L10n.format("workspace.document_menu_accessibility", documentName))
     }
 }

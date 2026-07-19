@@ -4,6 +4,7 @@ struct MarkdownEditorView: View {
     @Binding var text: String
     let textScale: Double
     @Binding var isFocused: Bool
+    let findTrigger: Int
     let readerTheme: ReaderTheme
 
     @Environment(\.colorScheme) private var colorScheme
@@ -22,12 +23,14 @@ struct MarkdownEditorView: View {
         text: Binding<String>,
         textScale: Double,
         isFocused: Binding<Bool>,
+        findTrigger: Int,
         readerTheme: ReaderTheme
     ) {
         _text = text
         _editorText = State(initialValue: text.wrappedValue)
         self.textScale = textScale
         _isFocused = isFocused
+        self.findTrigger = findTrigger
         self.readerTheme = readerTheme
     }
 
@@ -40,6 +43,7 @@ struct MarkdownEditorView: View {
             text: $editorText,
             selectedRange: $selectedRange,
             isFocused: $isFocused,
+            findTrigger: findTrigger,
             theme: theme,
             readerTheme: readerTheme,
             bodySize: bodySize * textScale

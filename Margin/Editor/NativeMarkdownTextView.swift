@@ -5,6 +5,7 @@ struct NativeMarkdownTextView: UIViewRepresentable {
     @Binding var text: String
     @Binding var selectedRange: NSRange
     @Binding var isFocused: Bool
+    let findTrigger: Int
     let theme: MarkdownTheme
     let readerTheme: ReaderTheme
     let bodySize: Double
@@ -77,6 +78,14 @@ struct NativeMarkdownTextView: UIViewRepresentable {
                     view.resignFirstResponder()
                 }
             }
+        }
+
+        if findTrigger != context.coordinator.lastFindTrigger {
+            context.coordinator.lastFindTrigger = findTrigger
+            if !view.isFirstResponder {
+                view.becomeFirstResponder()
+            }
+            view.findInteraction?.presentFindNavigator(showingReplace: false)
         }
     }
 
@@ -160,6 +169,7 @@ struct NativeMarkdownTextView: UIViewRepresentable {
     @MainActor
     final class Coordinator: NSObject, UITextViewDelegate {
         var parent: NativeMarkdownTextView
+        var lastFindTrigger = 0
         private var lastReaderTheme: ReaderTheme?
         private var lastBodySize: Double?
         private var lastTextColor: UIColor?

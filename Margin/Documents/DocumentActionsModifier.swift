@@ -5,6 +5,7 @@ struct DocumentActionsModifier: ViewModifier {
     let fileURL: URL?
     let displayName: String
     @Binding var requestedAction: DocumentActionRequest?
+    let onRenamed: (URL) -> Void
 
     @AppStorage("readerTheme") private var readerTheme = ReaderTheme.claude
 
@@ -49,8 +50,6 @@ struct DocumentActionsModifier: ViewModifier {
                 Button("common.cancel", role: .cancel) {}
                 Button("document.rename", action: renameDocument)
                     .disabled(!DocumentRenamer.isValidName(proposedName))
-            } message: {
-                Text("document.extension_unchanged")
             }
             .alert(item: $actionError) { error in
                 Alert(
@@ -110,10 +109,17 @@ struct DocumentActionsModifier: ViewModifier {
                 // Let the name-entry alert finish dismissing before the
                 // document browser presents any provider conflict UI.
                 try await Task.sleep(for: .milliseconds(250))
-                _ = try await DocumentRenamer.rename(
+                let renamedURL = try await DocumentRenamer.rename(
                     fileAt: fileURL,
                     to: proposedName
                 )
+                // The browser's move is a coordinated file operation, so
+                // DocumentGroup's presenter follows it for autosave — but the
+                // published fileURL stays stale until reopen. Report the new
+                // URL so the workspace can track it; the document stays open.
+                if renamedURL.standardizedFileURL != fileURL.standardizedFileURL {
+                    onRenamed(renamedURL)
+                }
             } catch {
                 actionError = .rename(error)
             }
