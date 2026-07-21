@@ -2,6 +2,6 @@ enum DocumentActionRequest: Equatable {
     case copy
     case move
     case rename
-    case share
+    case export(DocumentExportFormat)
     case print
 }

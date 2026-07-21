@@ -76,8 +76,8 @@ struct DocumentActionsModifier: ViewModifier {
             guard fileURL != nil, !isRenaming else { return }
             proposedName = displayName
             isRenamePresented = true
-        case .share:
-            shareDocument()
+        case let .export(format):
+            exportDocument(as: format)
         case .print:
             DocumentPrinter.present(
                 text: text,
@@ -88,15 +88,40 @@ struct DocumentActionsModifier: ViewModifier {
         }
     }
 
-    private func shareDocument() {
+    // Every format ends the same way — write a temporary file, then hand it
+    // to the system share sheet.
+    private func exportDocument(as format: DocumentExportFormat) {
         Task { @MainActor in
             do {
-                try await DocumentSharePresenter.present(
-                    markdown: text,
-                    suggestedName: displayName
-                )
+                switch format {
+                case .markdown:
+                    try await DocumentSharePresenter.present(
+                        markdown: text,
+                        suggestedName: displayName
+                    )
+                case .pdf:
+                    try await DocumentPDFExporter.export(
+                        text: text,
+                        title: displayName,
+                        theme: readerTheme,
+                        baseURL: fileURL?.deletingLastPathComponent()
+                    )
+                case .html:
+                    let html = MarkdownPrintRenderer.html(
+                        source: text,
+                        title: displayName,
+                        theme: readerTheme,
+                        baseURL: fileURL?.deletingLastPathComponent()
+                    )
+                    let exported = try DocumentSharePresenter.makeTemporaryFile(
+                        data: Data(html.utf8),
+                        suggestedName: displayName,
+                        pathExtension: format.pathExtension
+                    )
+                    try await DocumentSharePresenter.present(fileAt: exported)
+                }
             } catch {
-                actionError = .share(error)
+                actionError = .export(error)
             }
         }
     }
@@ -132,14 +157,14 @@ private enum DocumentActionError: Identifiable {
     case copy(Error)
     case move(Error)
     case rename(Error)
-    case share(Error)
+    case export(Error)
 
     var id: String {
         switch self {
         case .copy: "copy"
         case .move: "move"
         case .rename: "rename"
-        case .share: "share"
+        case .export: "export"
         }
     }
 
@@ -148,7 +173,7 @@ private enum DocumentActionError: Identifiable {
         case .copy: L10n.string("document.error.copy_title")
         case .move: L10n.string("document.error.move_title")
         case .rename: L10n.string("document.error.rename_title")
-        case .share: L10n.string("document.error.share_title")
+        case .export: L10n.string("document.error.export_title")
         }
     }
 
@@ -158,7 +183,7 @@ private enum DocumentActionError: Identifiable {
             L10n.string("document.error.files_retry")
         case let .rename(error):
             error.localizedDescription
-        case let .share(error):
+        case let .export(error):
             error.localizedDescription
         }
     }

@@ -37,12 +37,6 @@ struct PagesWorkspaceToolbar: View {
             }
             .foregroundStyle(accent)
 
-            Button(action: onSettings) {
-                Label("workspace.reader_settings", systemImage: "paintbrush")
-                    .frame(width: 44, height: 44)
-                    .contentShape(.rect)
-            }
-
             documentMenu
         }
         .labelStyle(.iconOnly)
@@ -64,6 +58,7 @@ struct PagesWorkspaceToolbar: View {
             Section(documentName) {
                 Button("workspace.outline", systemImage: "list.bullet.indent", action: onOutline)
                 Button("workspace.document_info", systemImage: "info.circle", action: onDocumentInfo)
+                Button("workspace.reader_settings", systemImage: "paintbrush", action: onSettings)
             }
 
             Section {
@@ -81,15 +76,23 @@ struct PagesWorkspaceToolbar: View {
             }
 
             Section {
-                Button("document.share", systemImage: "square.and.arrow.up") {
-                    onDocumentAction(.share)
+                Menu("document.export", systemImage: "square.and.arrow.up") {
+                    Button("document.export.markdown", systemImage: "doc.plaintext") {
+                        onDocumentAction(.export(.markdown))
+                    }
+                    Button("document.export.pdf", systemImage: "doc.richtext") {
+                        onDocumentAction(.export(.pdf))
+                    }
+                    Button("document.export.html", systemImage: "chevron.left.forwardslash.chevron.right") {
+                        onDocumentAction(.export(.html))
+                    }
                 }
                 Button("document.print", systemImage: "printer") {
                     onDocumentAction(.print)
                 }
             }
         } label: {
-            Label("workspace.more", systemImage: "doc.text")
+            Label("workspace.more", systemImage: "ellipsis")
                 .frame(width: 44, height: 44)
                 .contentShape(.rect)
         }

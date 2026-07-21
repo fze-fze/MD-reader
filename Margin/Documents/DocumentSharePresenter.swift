@@ -8,7 +8,10 @@ enum DocumentSharePresenter {
             markdown: markdown,
             suggestedName: suggestedName
         )
+        try await present(fileAt: sharedFile)
+    }
 
+    static func present(fileAt sharedFile: URL) async throws {
         // The title menu needs to finish dismissing before UIKit can present
         // the activity controller from the document window.
         try await Task.sleep(for: .milliseconds(250))
@@ -43,6 +46,33 @@ enum DocumentSharePresenter {
         markdown: String,
         suggestedName: String
     ) throws -> URL {
+        let fileURL = try temporaryFileURL(
+            suggestedName: suggestedName,
+            pathExtension: "md"
+        )
+        try markdown.write(to: fileURL, atomically: true, encoding: .utf8)
+        return fileURL
+    }
+
+    static func makeTemporaryFile(
+        data: Data,
+        suggestedName: String,
+        pathExtension: String
+    ) throws -> URL {
+        let fileURL = try temporaryFileURL(
+            suggestedName: suggestedName,
+            pathExtension: pathExtension
+        )
+        try data.write(to: fileURL, options: .atomic)
+        return fileURL
+    }
+
+    // Each share gets its own directory so the completion handler can delete
+    // the whole thing without touching other in-flight shares.
+    private static func temporaryFileURL(
+        suggestedName: String,
+        pathExtension: String
+    ) throws -> URL {
         let directory = FileManager.default.temporaryDirectory
             .appending(path: "MarginShare", directoryHint: .isDirectory)
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)
@@ -51,12 +81,10 @@ enum DocumentSharePresenter {
             withIntermediateDirectories: true
         )
 
-        let fileURL = directory.appending(
-            path: "\(sanitizedFilename(suggestedName)).md",
+        return directory.appending(
+            path: "\(sanitizedFilename(suggestedName)).\(pathExtension)",
             directoryHint: .notDirectory
         )
-        try markdown.write(to: fileURL, atomically: true, encoding: .utf8)
-        return fileURL
     }
 
     private static func sanitizedFilename(_ name: String) -> String {

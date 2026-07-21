@@ -444,6 +444,59 @@ struct MarkdownParserTests {
         #expect(chineseTemplate.hasPrefix("# 欢迎使用 Margin"))
     }
 
+    @Test @MainActor func writesExportedFilesWithTheirFormatExtension() throws {
+        #expect(DocumentExportFormat.markdown.pathExtension == "md")
+        #expect(DocumentExportFormat.pdf.pathExtension == "pdf")
+        #expect(DocumentExportFormat.html.pathExtension == "html")
+
+        let html = MarkdownPrintRenderer.html(
+            source: "# 标题\n\n正文 $E=mc^2$",
+            title: "导出",
+            theme: .claude
+        )
+        let fileURL = try DocumentSharePresenter.makeTemporaryFile(
+            data: Data(html.utf8),
+            suggestedName: "导出/测试",
+            pathExtension: DocumentExportFormat.html.pathExtension
+        )
+        defer { try? FileManager.default.removeItem(at: fileURL.deletingLastPathComponent()) }
+
+        #expect(fileURL.pathExtension == "html")
+        // Path separators in the document name must not create directories.
+        #expect(fileURL.lastPathComponent == "导出-测试.html")
+        let written = try String(contentsOf: fileURL, encoding: .utf8)
+        #expect(written == html)
+        // Exported HTML is self-contained: the formula travels as a data URI.
+        #expect(written.contains("data:image/png;base64,"))
+    }
+
+    @Test @MainActor func exportsDocumentAsAPaginatedPDF() async throws {
+        let source = """
+        # 导出测试
+
+        正文有 **粗体** 与行内公式 $E=mc^2$。
+
+        $$
+        \\frac{a}{b}
+        $$
+
+        \(String(repeating: "很长的段落用来撑满至少一页。\n\n", count: 60))
+        """
+
+        let data = try await DocumentPDFExporter.pdfData(
+            text: source,
+            title: "导出测试",
+            theme: .claude,
+            baseURL: nil
+        )
+
+        #expect(data.starts(with: Array("%PDF".utf8)))
+
+        let document = try #require(CGPDFDocument(CGDataProvider(data: data as CFData)!))
+        // The filler paragraphs must paginate rather than clip to one page.
+        #expect(document.numberOfPages > 1)
+    }
+
     @Test @MainActor func stylerCacheStaysConsistentAcrossThemesAndFonts() {
         let source = "Plain **bold** with `code` span."
         let claudeLight = MarkdownTheme(readerTheme: .claude, colorScheme: .light)

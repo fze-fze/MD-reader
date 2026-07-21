@@ -87,6 +87,8 @@ Persistence is three `@AppStorage` keys, declared in `DocumentWorkspaceView`: `r
 
 `DocumentPrinter` → `MarkdownPrintRenderer.html(source:title:theme:)` produces standalone styled HTML (escaping is hand-rolled and tested) → `UIPrintInteractionController`. The HTML follows the current `ReaderTheme` — per-theme `Palette` drives fonts, colors, and heading scale, and math images render with the theme's math font; print always uses the light palette.
 
+The document menu's **Export** submenu offers Markdown / PDF / HTML; each writes a temporary file via `DocumentSharePresenter.makeTemporaryFile` and hands it to the share sheet (there is no separate "Share" item — Markdown export replaces it). `DocumentPDFExporter` reuses that same HTML for the PDF format, then shares the file via `DocumentSharePresenter`. It paginates a **`WKWebView`** (loaded and awaited) rather than a `UIMarkupTextPrintFormatter`, because the formatter paginates before the base64 `data:` URI images finish loading and silently drops every formula and task checkbox. The stylesheet's `print-color-adjust: exact` is what keeps WebKit from stripping background fills in that path.
+
 ## Tests
 
 `MarginTests/MarkdownParserTests.swift` — swift-testing (`import Testing`, `@Test`, `#expect`), one file that currently covers the parser, statistics, search index, typography cascade, quick action, task toggler, share, and print renderer. Tests that touch `DocumentSharePresenter` etc. need `@MainActor`.

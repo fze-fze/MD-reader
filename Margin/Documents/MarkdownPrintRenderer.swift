@@ -97,7 +97,9 @@ enum MarkdownPrintRenderer {
         <title>\(escape(title))</title>
         <style>
         @page { margin: 16mm 17mm 18mm; }
-        * { box-sizing: border-box; }
+        /* WebKit drops background fills when printing unless asked not to,
+           which would strip inline-code and quote backgrounds from PDFs. */
+        * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         body { color: \(palette.text); font-family: \(palette.bodyFont); font-size: 13pt; line-height: 1.58; margin: 0; overflow-wrap: anywhere; }
         h1, h2, h3, h4, h5, h6 { color: \(palette.headingText); font-weight: 600; line-height: 1.22; margin: 1.15em 0 .38em; break-after: avoid; }
         \(palette.headingSizes)
