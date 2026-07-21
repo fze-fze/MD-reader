@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct InlineMarkdownFonts {
+struct InlineMarkdownFonts: Hashable {
     let regular: Font
     let emphasized: Font
     let strong: Font

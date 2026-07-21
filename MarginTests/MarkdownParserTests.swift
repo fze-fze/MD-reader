@@ -444,6 +444,40 @@ struct MarkdownParserTests {
         #expect(chineseTemplate.hasPrefix("# 欢迎使用 Margin"))
     }
 
+    @Test @MainActor func stylerCacheStaysConsistentAcrossThemesAndFonts() {
+        let source = "Plain **bold** with `code` span."
+        let claudeLight = MarkdownTheme(readerTheme: .claude, colorScheme: .light)
+        let claudeDark = MarkdownTheme(readerTheme: .claude, colorScheme: .dark)
+        let bodyFonts = MarkdownTypography.inlineFonts(theme: .claude, size: 16)
+        let headingFonts = MarkdownTypography.inlineFonts(
+            theme: .claude,
+            size: 24,
+            weight: .semibold
+        )
+
+        // Repeated calls (cache hit) must equal a fresh build.
+        let first = InlineMarkdownStyler.attributedString(
+            source: source, fonts: bodyFonts, theme: claudeLight
+        )
+        let second = InlineMarkdownStyler.attributedString(
+            source: source, fonts: bodyFonts, theme: claudeLight
+        )
+        #expect(first == second)
+
+        // A different color scheme recolors the code span, so the cache must
+        // not return the light-mode result for dark mode.
+        let darkVariant = InlineMarkdownStyler.attributedString(
+            source: source, fonts: bodyFonts, theme: claudeDark
+        )
+        #expect(darkVariant != first)
+
+        // Larger, heavier fonts must not collide with the body-size entry.
+        let headingVariant = InlineMarkdownStyler.attributedString(
+            source: source, fonts: headingFonts, theme: claudeLight
+        )
+        #expect(headingVariant != first)
+    }
+
     @Test @MainActor func rendersStrongEmphasisAndCombinedEmphasisWithConcreteFonts() {
         let fonts = MarkdownTypography.inlineFonts(
             theme: .claude,

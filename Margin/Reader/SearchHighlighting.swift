@@ -8,6 +8,12 @@ enum SearchHighlighting {
         occurrenceOffset: Int,
         theme: MarkdownTheme
     ) -> AttributedString {
+        // The reader passes an empty query to every non-matching block on each
+        // render; skip the character-string allocation and matcher on that path.
+        guard !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return attributedText
+        }
+
         var attributedText = attributedText
         let visibleText = String(attributedText.characters)
         let matches = DocumentSearchMatcher.ranges(in: visibleText, query: query)
