@@ -268,6 +268,59 @@ struct MarkdownParserTests {
         #expect(!blocks.contains { if case .math = $0.kind { true } else { false } })
     }
 
+    @Test @MainActor func loadsAndCachesDocumentRelativeImages() async throws {
+        let folder = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = 1
+        let renderer = UIGraphicsImageRenderer(
+            size: CGSize(width: 24, height: 12),
+            format: format
+        )
+        let pngData = renderer.pngData { context in
+            UIColor.systemRed.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 24, height: 12))
+        }
+        let imageURL = folder.appending(path: "local.png")
+        try pngData.write(to: imageURL)
+
+        // A document-relative image must load off the main thread through the
+        // same cache the remote path uses, not decode inline in the view body.
+        let loaded = try await ReaderImageLoader.shared.image(for: imageURL)
+        #expect(loaded.size.width == 24)
+        #expect(loaded.size.height == 12)
+
+        // Second request is served from cache — same decoded instance.
+        let cached = try await ReaderImageLoader.shared.image(for: imageURL)
+        #expect(cached === loaded)
+
+        // A missing file surfaces as an error rather than a blank image.
+        let missingURL = folder.appending(path: "missing.png")
+        await #expect(throws: (any Error).self) {
+            try await ReaderImageLoader.shared.image(for: missingURL)
+        }
+    }
+
+    @Test func segmenterCacheReturnsIdenticalResultsOnRepeatCalls() {
+        let sources = [
+            "质能关系 $E=mc^2$ 成立",
+            "价格 $5 和 $10 都可以",
+            "没有公式的纯文本",
+            "`code $x$` 之外 $y$"
+        ]
+        // Second pass hits the memo; it must equal the freshly computed run.
+        let first = sources.map { InlineMathSegmenter.segments(in: $0) }
+        InlineMathSegmenter.purgeCache()
+        let uncached = sources.map { InlineMathSegmenter.segments(in: $0) }
+        let cached = sources.map { InlineMathSegmenter.segments(in: $0) }
+
+        #expect(first == uncached)
+        #expect(cached == uncached)
+    }
+
     @Test func segmentsInlineMathWithHeuristics() {
         #expect(InlineMathSegmenter.segments(in: "质能关系 $E=mc^2$ 成立") == [
             .text("质能关系 "),
@@ -581,8 +634,15 @@ struct MarkdownParserTests {
         #expect(regularCJK != nil)
         #expect(italicCJK != regularCJK)
         #expect(boldCJK != regularCJK)
-        #expect(italicUIFont.fontDescriptor.symbolicTraits.contains(.traitItalic))
-        #expect(italicCascade?.contains { $0.postscriptName.contains("Kaiti") } == true)
+        // Emphasis is a synthesized oblique: no bundled face has an italic
+        // variant, so the slant lives in the font matrix and the CJK cascade
+        // stays on the body serif (it inherits the same shear).
+        #expect(italicUIFont.pointSize == 16)
+        #expect(CTFontGetMatrix(italicUIFont as CTFont).c > 0)
+        #expect(
+            italicCascade?.contains { $0.postscriptName == "NotoSerifSC-Regular" }
+                == true
+        )
         #expect(strongUIFont.fontDescriptor.withDesign(.serif) != nil)
         #expect(
             strongCascade?.contains { $0.postscriptName == "NotoSerifSC-SemiBold" }

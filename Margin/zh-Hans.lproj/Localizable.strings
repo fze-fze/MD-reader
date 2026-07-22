@@ -73,8 +73,6 @@
 "document.error.not_ready" = "文稿尚未准备好，请稍后重试。";
 "document.error.no_share_window" = "找不到可用于显示分享面板的窗口。";
 "document.share.untitled" = "未命名";
-"quick_action.new_document" = "新建 md 文稿";
-"quick_action.default_filename" = "新建文稿";
 
 "editor.format" = "格式";
 "editor.heading_section" = "标题";

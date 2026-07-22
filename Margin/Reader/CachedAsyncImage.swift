@@ -26,7 +26,7 @@ struct CachedAsyncImage<Content: View>: View {
     private func loadImage() async {
         phase = .empty
         do {
-            let image = try await RemoteImageLoader.shared.image(for: url)
+            let image = try await ReaderImageLoader.shared.image(for: url)
             try Task.checkCancellation()
             phase = .success(Image(uiImage: image))
         } catch is CancellationError {
@@ -40,8 +40,8 @@ struct CachedAsyncImage<Content: View>: View {
 }
 
 @MainActor
-private final class RemoteImageLoader {
-    static let shared = RemoteImageLoader()
+final class ReaderImageLoader {
+    static let shared = ReaderImageLoader()
 
     private let cache = NSCache<NSURL, UIImage>()
     private var inFlight: [URL: Task<UIImage, any Error>] = [:]
@@ -60,10 +60,23 @@ private final class RemoteImageLoader {
         }
 
         let request = Task { @MainActor in
-            let (data, response) = try await URLSession.shared.data(from: url)
-            guard let response = response as? HTTPURLResponse,
-                  (200..<300).contains(response.statusCode),
-                  let decodedImage = UIImage(data: data),
+            let data: Data
+            if url.isFileURL {
+                // Reading and decoding a document-relative image used to happen
+                // inline in the view body, stalling the scroll on every render.
+                data = try await Task.detached(priority: .userInitiated) {
+                    try Data(contentsOf: url, options: .mappedIfSafe)
+                }.value
+            } else {
+                let (remoteData, response) = try await URLSession.shared.data(from: url)
+                guard let response = response as? HTTPURLResponse,
+                      (200..<300).contains(response.statusCode) else {
+                    throw URLError(.badServerResponse)
+                }
+                data = remoteData
+            }
+
+            guard let decodedImage = UIImage(data: data),
                   let preparedImage = await decodedImage.byPreparingForDisplay() else {
                 throw URLError(.cannotDecodeContentData)
             }

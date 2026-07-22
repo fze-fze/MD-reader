@@ -180,7 +180,9 @@ private struct MarkdownBlockView: View {
     }
 
     private func list(_ items: [MarkdownListItem], ordered: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 7) {
+        let offsets = fragmentOccurrenceOffsets
+        let itemFonts = inlineFonts(size: bodySize)
+        return VStack(alignment: .leading, spacing: 7) {
             ForEach(items.enumerated(), id: \.element.id) { itemIndex, item in
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(ordered ? "\(itemIndex + 1)." : "•")
@@ -189,13 +191,13 @@ private struct MarkdownBlockView: View {
                         .frame(minWidth: 20, alignment: .trailing)
                     InlineMarkdownText(
                         source: item.text,
-                        fonts: inlineFonts(size: bodySize),
+                        fonts: itemFonts,
                         mathFontSize: bodySize,
                         foregroundStyle: theme.textPrimary,
                         theme: theme,
                         searchText: searchText,
                         activeOccurrenceIndex: activeOccurrenceIndex,
-                        occurrenceOffset: occurrenceOffset(for: itemIndex)
+                        occurrenceOffset: occurrenceOffset(offsets, itemIndex)
                     )
                     .lineSpacing(bodySize * 0.38)
                 }
@@ -206,7 +208,9 @@ private struct MarkdownBlockView: View {
     }
 
     private func taskList(_ items: [MarkdownListItem]) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+        let offsets = fragmentOccurrenceOffsets
+        let itemFonts = inlineFonts(size: bodySize)
+        return VStack(alignment: .leading, spacing: 4) {
             ForEach(items.enumerated(), id: \.element.id) { itemIndex, item in
                 HStack(alignment: .center, spacing: 0) {
                     Button {
@@ -243,13 +247,13 @@ private struct MarkdownBlockView: View {
 
                     InlineMarkdownText(
                         source: item.text,
-                        fonts: inlineFonts(size: bodySize),
+                        fonts: itemFonts,
                         mathFontSize: bodySize,
                         foregroundStyle: theme.textPrimary,
                         theme: theme,
                         searchText: searchText,
                         activeOccurrenceIndex: activeOccurrenceIndex,
-                        occurrenceOffset: occurrenceOffset(for: itemIndex)
+                        occurrenceOffset: occurrenceOffset(offsets, itemIndex)
                     )
                     .accessibilityHidden(true)
                 }
@@ -298,19 +302,22 @@ private struct MarkdownBlockView: View {
     }
 
     private func table(headers: [String], rows: [[String]]) -> some View {
-        ScrollView(.horizontal) {
+        let offsets = fragmentOccurrenceOffsets
+        let headerFonts = inlineFonts(size: bodySize * 0.93, weight: .semibold)
+        let cellFonts = inlineFonts(size: bodySize * 0.93)
+        return ScrollView(.horizontal) {
             Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 0) {
                 GridRow {
                     ForEach(headers.enumerated(), id: \.offset) { columnIndex, value in
                         InlineMarkdownText(
                             source: value,
-                            fonts: inlineFonts(size: bodySize * 0.93, weight: .semibold),
+                            fonts: headerFonts,
                             mathFontSize: bodySize * 0.93,
                             foregroundStyle: theme.textStrong,
                             theme: theme,
                             searchText: searchText,
                             activeOccurrenceIndex: activeOccurrenceIndex,
-                            occurrenceOffset: occurrenceOffset(for: columnIndex)
+                            occurrenceOffset: occurrenceOffset(offsets, columnIndex)
                         )
                         .padding(.vertical, 12)
                     }
@@ -321,14 +328,15 @@ private struct MarkdownBlockView: View {
                         ForEach(row.enumerated(), id: \.offset) { columnIndex, value in
                             InlineMarkdownText(
                                 source: value,
-                                fonts: inlineFonts(size: bodySize * 0.93),
+                                fonts: cellFonts,
                                 mathFontSize: bodySize * 0.93,
                                 foregroundStyle: theme.textPrimary,
                                 theme: theme,
                                 searchText: searchText,
                                 activeOccurrenceIndex: activeOccurrenceIndex,
                                 occurrenceOffset: occurrenceOffset(
-                                    for: headers.count + rowIndex * headers.count + columnIndex
+                                    offsets,
+                                    headers.count + rowIndex * headers.count + columnIndex
                                 )
                             )
                             .padding(.vertical, 12)
@@ -376,7 +384,7 @@ private struct MarkdownBlockView: View {
     @ViewBuilder
     private func markdownImage(alt: String, source: String) -> some View {
         VStack(alignment: .leading, spacing: 7) {
-            if let url = URL(string: source), ["http", "https"].contains(url.scheme?.lowercased()) {
+            if let url = imageURL(for: source) {
                 CachedAsyncImage(url: url) { phase in
                     switch phase {
                     case let .success(image):
@@ -389,10 +397,6 @@ private struct MarkdownBlockView: View {
                         imagePlaceholder(alt: alt)
                     }
                 }
-            } else if let image = localImage(source: source) {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFit()
             } else {
                 imagePlaceholder(alt: alt)
             }
@@ -428,10 +432,17 @@ private struct MarkdownBlockView: View {
         .background(theme.codeFill, in: .rect(cornerRadius: 8))
     }
 
-    private func localImage(source: String) -> UIImage? {
+    // Remote and document-relative images both load through the shared cache;
+    // this only resolves the URL, leaving I/O and decoding to the loader.
+    private func imageURL(for source: String) -> URL? {
+        if let url = URL(string: source),
+           ["http", "https"].contains(url.scheme?.lowercased()) {
+            return url
+        }
         guard let baseURL else { return nil }
         let path = source.removingPercentEncoding ?? source
-        return UIImage(contentsOfFile: baseURL.appending(path: path).standardizedFileURL.path())
+        let fileURL = baseURL.appending(path: path).standardizedFileURL
+        return FileManager.default.fileExists(atPath: fileURL.path()) ? fileURL : nil
     }
 
     private func documentFont(
@@ -456,11 +467,27 @@ private struct MarkdownBlockView: View {
         )
     }
 
-    private func occurrenceOffset(for fragmentIndex: Int) -> Int {
-        guard fragmentIndex > 0 else { return 0 }
-        return block.searchableFragments.prefix(fragmentIndex).reduce(into: 0) { count, fragment in
-            count += DocumentSearchMatcher.ranges(in: fragment, query: searchText).count
+    // Prefix sums of per-fragment match counts, so a list item or table cell
+    // knows where its own matches start within the block. Computing fragments
+    // parses markdown, so this stays empty unless a search is actually running
+    // — otherwise every render of every list and table would pay for it.
+    private var fragmentOccurrenceOffsets: [Int] {
+        guard !searchText.isEmpty else { return [] }
+
+        var offsets: [Int] = []
+        var runningTotal = 0
+        for fragment in block.searchableFragments {
+            offsets.append(runningTotal)
+            runningTotal += DocumentSearchMatcher.ranges(
+                in: fragment,
+                query: searchText
+            ).count
         }
+        return offsets
+    }
+
+    private func occurrenceOffset(_ offsets: [Int], _ fragmentIndex: Int) -> Int {
+        offsets.indices.contains(fragmentIndex) ? offsets[fragmentIndex] : 0
     }
 }
 

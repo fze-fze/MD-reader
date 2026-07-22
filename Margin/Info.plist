@@ -53,17 +53,6 @@
 		<string>AnthropicSerifWebText-Regular.ttf</string>
 		<string>NotoSerifSC-Variable.ttf</string>
 	</array>
-	<key>UIApplicationShortcutItems</key>
-	<array>
-		<dict>
-			<key>UIApplicationShortcutItemIconType</key>
-			<string>UIApplicationShortcutIconTypeCompose</string>
-			<key>UIApplicationShortcutItemTitle</key>
-			<string>New Markdown Document</string>
-			<key>UIApplicationShortcutItemType</key>
-			<string>com.fze.margin.new-markdown-document</string>
-		</dict>
-	</array>
 	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<true/>
 	<key>UISupportsDocumentBrowser</key>

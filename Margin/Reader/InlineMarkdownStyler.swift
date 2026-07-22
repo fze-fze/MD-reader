@@ -40,6 +40,11 @@ enum InlineMarkdownStyler {
         return styled
     }
 
+    @MainActor
+    static func purgeCache() {
+        cache.removeAll()
+    }
+
     private static func buildAttributedString(
         source: String,
         fonts: InlineMarkdownFonts,

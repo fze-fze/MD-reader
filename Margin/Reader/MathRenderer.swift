@@ -80,6 +80,11 @@ enum MathRenderer {
         return normalized
     }
 
+    static func purgeCache() {
+        cache.removeAll()
+        failedKeys.removeAll()
+    }
+
     private static func render(
         latex: String,
         fontSize: CGFloat,

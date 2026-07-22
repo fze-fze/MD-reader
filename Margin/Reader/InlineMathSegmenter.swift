@@ -6,6 +6,13 @@ nonisolated enum InlineMathSegmenter {
         case math(latex: String, isDisplay: Bool)
     }
 
+    // Segmenting copies the string into an array and scans it. The reader
+    // re-runs it on every body evaluation of every visible block, so memoize
+    // the pure result. Text without a "$" short-circuits before the lock,
+    // which is the overwhelmingly common case.
+    private static let cacheLock = NSLock()
+    nonisolated(unsafe) private static var cache: [String: [Segment]] = [:]
+
     // Inline math is $…$ only; display $$ is a block-level construct handled
     // by MarkdownParser, so a mid-sentence $$ stays literal text.
     static func segments(in source: String) -> [Segment] {
@@ -13,6 +20,25 @@ nonisolated enum InlineMathSegmenter {
             return [.text(source)]
         }
 
+        if let cached = cacheLock.withLock({ cache[source] }) {
+            return cached
+        }
+
+        let segments = computeSegments(in: source)
+        cacheLock.withLock {
+            if cache.count > 500 {
+                cache.removeAll(keepingCapacity: true)
+            }
+            cache[source] = segments
+        }
+        return segments
+    }
+
+    static func purgeCache() {
+        cacheLock.withLock { cache.removeAll() }
+    }
+
+    private static func computeSegments(in source: String) -> [Segment] {
         let characters = Array(source)
         var segments: [Segment] = []
         var textBuffer = ""

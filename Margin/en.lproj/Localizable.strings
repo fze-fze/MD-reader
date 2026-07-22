@@ -73,8 +73,6 @@
 "document.error.not_ready" = "The document is not ready yet. Try again in a moment.";
 "document.error.no_share_window" = "No active window is available to show the share sheet.";
 "document.share.untitled" = "Untitled";
-"quick_action.new_document" = "New Markdown Document";
-"quick_action.default_filename" = "New Document";
 
 "editor.format" = "Format";
 "editor.heading_section" = "Headings";

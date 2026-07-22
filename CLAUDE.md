@@ -30,7 +30,7 @@ The project uses **file-system-synchronized groups** (`PBXFileSystemSynchronized
 
 `MDReaderApp` is the SwiftUI `@main` entry point. Its `DocumentGroup` supplies the system document browser, one `MarkdownDocument` (`FileDocument`) value per open file, file coordination, external-change handling, and autosave. `DocumentWorkspaceView` edits `file.$document.text` directly. Do not add a parallel `UIDocument`, session cache, or second file presenter for the same URL.
 
-`MarginAppDelegate` is attached with `@UIApplicationDelegateAdaptor` only to receive the Home Screen Quick Action. `QuickActionDocumentCreator` creates a blank file in the app Documents directory and asks the system to open its URL; the pending path is consumed when the corresponding `DocumentGroup` workspace appears.
+`MarginAppDelegate` is attached with `@UIApplicationDelegateAdaptor` only to purge the reader caches on a memory warning. There is deliberately **no Home Screen quick action**: it was removed after repeatedly failing on device — SwiftUI apps are scene-based, so the shortcut only arrives through scene-delegate callbacks, and even once delivered the app cannot reopen a file from its own container (`UIApplication.open` just activates the app, and SwiftUI's `openDocument` is macOS-only). See git history around 0.2.x before attempting it again.
 
 ### Document operations
 
@@ -48,6 +48,8 @@ The project uses **file-system-synchronized groups** (`PBXFileSystemSynchronized
 Inline markdown (`**bold**`, `` `code` ``, links) is *not* parsed by `MarkdownParser` — it's handed to `AttributedString(markdown:)` with `.inlineOnlyPreservingWhitespace` inside `InlineMarkdownText` / `MarkdownBlock.inlinePlainText`.
 
 Parsing and search indexing run off the main actor via `Task.detached` in `MarkdownReaderView.task(id: source)`; the model types are `nonisolated` + `Sendable` for this reason.
+
+Scrolling re-evaluates every visible block's body, so anything expensive there is memoized: `InlineMarkdownStyler` (parsed+styled `AttributedString`), `InlineMathSegmenter` (lock-guarded — also reached off-main by search indexing), `MathRenderer` (formula images), and `MarkdownTypography.inlineFonts`. All are bounded and dropped on `applicationDidReceiveMemoryWarning`. Two rules follow: never call `MarkdownBlock.searchableFragments` from a view body (it re-parses markdown — `fragmentOccurrenceOffsets` computes prefix sums once per block and only while searching), and load images through `CachedAsyncImage`/`ReaderImageLoader` (both remote and document-relative) rather than decoding inline.
 
 ### Math (LaTeX)
 

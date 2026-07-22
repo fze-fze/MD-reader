@@ -1,3 +1,4 @@
+import CoreText
 import SwiftUI
 import UIKit
 
@@ -96,32 +97,56 @@ enum MarkdownTypography {
         weight: UIFont.Weight
     ) -> UIFont {
         let pointSize = CGFloat(size)
-        let systemFont = UIFont.systemFont(ofSize: pointSize, weight: weight)
-        var descriptor = systemFont.fontDescriptor
-        if theme == .claude {
-            descriptor = descriptor.withDesign(.serif) ?? descriptor
+        let descriptor: UIFontDescriptor
+        switch theme {
+        case .claude:
+            descriptor = claudeDescriptor(size: pointSize, weight: weight)
+        case .github:
+            descriptor = UIFont.systemFont(ofSize: pointSize, weight: weight)
+                .fontDescriptor
+                .addingAttributes([
+                    .cascadeList: [cjkSerifDescriptor(size: pointSize, weight: weight)]
+                ])
         }
+        // `.traitItalic` is useless here: neither the bundled Anthropic serif nor
+        // any CJK face ships an italic variant, so the trait resolves back to the
+        // upright font and emphasis renders identically to body text. Synthesize
+        // the slant with a shear matrix instead — the whole cascade inherits it,
+        // which is what makes CJK emphasis actually lean (the same oblique a
+        // browser synthesizes for `font-style: italic`).
+        return obliqueFont(descriptor: descriptor, size: pointSize)
+    }
 
-        let traits = descriptor.symbolicTraits.union(.traitItalic)
-        descriptor = descriptor.withSymbolicTraits(traits) ?? descriptor
-        descriptor = descriptor.addingAttributes([
-            .cascadeList: [cjkItalicDescriptor(size: pointSize, weight: weight)]
-        ])
-        return UIFont(descriptor: descriptor, size: pointSize)
+    /// Slant applied to synthesized obliques, as tan(θ) for θ ≈ 12°.
+    private static let obliqueSlant: CGFloat = 0.21
+
+    private static func obliqueFont(
+        descriptor: UIFontDescriptor,
+        size: CGFloat
+    ) -> UIFont {
+        var shear = CGAffineTransform(a: 1, b: 0, c: obliqueSlant, d: 1, tx: 0, ty: 0)
+        let font = CTFontCreateWithFontDescriptor(descriptor as CTFontDescriptor, size, &shear)
+        return unsafeBitCast(font, to: UIFont.self)
     }
 
     private static func claudeFont(size: CGFloat, weight: UIFont.Weight) -> UIFont {
+        UIFont(descriptor: claudeDescriptor(size: size, weight: weight), size: size)
+    }
+
+    private static func claudeDescriptor(
+        size: CGFloat,
+        weight: UIFont.Weight
+    ) -> UIFontDescriptor {
         let fallback = UIFont.systemFont(ofSize: size, weight: weight)
         let baseDescriptor = UIFont(
             name: "AnthropicSerifWebVariable-TextRegular",
             size: size
         )?.fontDescriptor ?? fallback.fontDescriptor.withDesign(.serif) ?? fallback.fontDescriptor
 
-        let descriptor = baseDescriptor.addingAttributes([
+        return baseDescriptor.addingAttributes([
             .traits: [UIFontDescriptor.TraitKey.weight: weight.rawValue],
             .cascadeList: [cjkSerifDescriptor(size: size, weight: weight)]
         ])
-        return UIFont(descriptor: descriptor, size: size)
     }
 
     private static func cjkSerifDescriptor(
@@ -154,18 +179,4 @@ enum MarkdownTypography {
             "STSongti-SC-Regular"
         }
     }
-
-    private static func cjkItalicDescriptor(
-        size: CGFloat,
-        weight: UIFont.Weight
-    ) -> UIFontDescriptor {
-        let preferredName = weight.rawValue >= UIFont.Weight.semibold.rawValue
-            ? "STKaiti-SC-Bold"
-            : "STKaiti-SC-Regular"
-        let availableName = UIFont(name: preferredName, size: size) != nil
-            ? preferredName
-            : "STKaiti-SC-Regular"
-        return UIFontDescriptor(name: availableName, size: size)
-    }
-
 }

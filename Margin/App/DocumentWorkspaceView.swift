@@ -120,11 +120,6 @@ struct DocumentWorkspaceView: View {
                 onRenamed: { renamedFileURL = $0 }
             )
         )
-        .onAppear {
-            if QuickActionDocumentCreator.consumeEditorRequest(for: fileURL) {
-                beginEditing()
-            }
-        }
         .onChange(of: text) { _, updatedText in
             if mode == .read {
                 readerSource = updatedText
