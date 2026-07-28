@@ -80,6 +80,7 @@ struct DocumentWorkspaceView: View {
         }
         .environment(\.colorScheme, resolvedColorScheme)
         .toolbarVisibility(.hidden, for: .navigationBar)
+        .background(DocumentNavigationBarHider())
         .background(InteractivePopGestureRestorer())
         .safeAreaInset(edge: .top, spacing: 0) {
             PagesDocumentNavigationBar(

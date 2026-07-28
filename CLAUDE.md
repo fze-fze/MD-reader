@@ -38,6 +38,7 @@ The project uses **file-system-synchronized groups** (`PBXFileSystemSynchronized
 - `DocumentRenamer` renames through `UIDocumentBrowserViewController.renameDocument` (found via `AppPresentationAnchor` traversal) because the app lacks parent-directory permission for provider-owned files. The document stays open: the coordinated move keeps DocumentGroup's internal presenter (autosave) on track, but the published `fileURL` stays stale until reopen, so `DocumentWorkspaceView` tracks the post-rename URL in `renamedFileURL` and derives name/actions from it.
 - Like Pages, the navigation bar shows no title text: the toolbar's document icon opens the document menu (`PagesWorkspaceToolbar.documentMenu`) whose topmost section header is the file name, above outline/info and the file actions.
 - `DocumentWorkspaceView` must continue to receive `file.$document.text` rather than copying it into independent state.
+- The workspace draws its own chrome (`PagesDocumentNavigationBar`) and hides the system one with `.toolbarVisibility(.hidden, for: .navigationBar)`. That preference is applied too late when another app opens a file in Margin, leaving DocumentGroup's bar on screen above ours for the rest of the app's lifetime (bar visibility is navigation-controller state, so opening another document does not clear it). `DocumentNavigationBarHider` is the UIKit backstop that keeps it hidden and restores whatever it hid on the way out — keep both.
 
 ### Reader pipeline and the block-ID invariant
 
