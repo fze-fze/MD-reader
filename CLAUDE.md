@@ -59,6 +59,14 @@ Rendering is native via the **SwiftMath** SPM package (the project's only depend
 
 Search: inline math becomes U+FFFC in `searchableFragments` so index match counts stay aligned with per-segment highlighting; block math is searchable by its raw LaTeX. Print embeds formulas as base64 `<img>` data URIs (`MarkdownPrintRenderer.mathImageTag`, sized in `pt`, inline images baseline-shifted by the descent); invalid LaTeX prints as raw `$$…$$`.
 
+### Mermaid diagrams
+
+A ` ```mermaid ` fence stays a `MarkdownBlock.Kind.code` block (`MermaidSupport.isMermaid` reads the first infostring token) but renders as `MermaidBlockView` instead of source, and its copy button becomes **导出图片 / Export Image** (`DiagramExportImageButton` → `DiagramImageExporter.pngData`, which draws the diagram over `theme.codeFill` with padding so the shared PNG is opaque).
+
+There is no native mermaid renderer, so `MermaidRenderer` (`@MainActor`, singleton) drives the bundled **mermaid.js** (`Margin/Resources/Mermaid/mermaid.min.js`, MIT, loaded by `mermaid-host.html` — everything is offline, nothing is fetched) in **one** offscreen `WKWebView` living at the back of the key window, because WebKit only renders — and only snapshots — a web view that is in a window. `mermaid-host.html`'s `render()` lays the diagram out, forces explicit `width`/`height` from the SVG `viewBox` (mermaid's `useMaxWidth` otherwise reports 100%), and returns the intrinsic size; the renderer resizes the web view to that size, calls `takeSnapshot`, and caches the `UIImage` keyed by `MermaidStyle` (theme × appearance × rounded text size) + source. Views read the cache synchronously in their body like `MathRenderer`, so scrolling never touches the web view; oversized diagrams are laid out a second time at a smaller scale rather than snapshotted huge, renders are serialized through one task chain because the stage element is shared, and `purge()` (memory warning) drops the images *and* the web view. Mermaid runs with `securityLevel: 'strict'` — documents are untrusted input. Only a diagram mermaid refuses to parse caches its failure; those blocks fall back to the source plus the parser's message, with the copy button back.
+
+Diagram colors come from `MarkdownTheme` tokens converted to hex `themeVariables` (mermaid `theme: 'base'`), so diagrams follow the reader theme and appearance. Print/PDF is unchanged: a mermaid block still prints as a fenced code block.
+
 ### Search
 
 `DocumentSearchIndex` is built from each block's `searchableFragments` (markdown syntax stripped, so `**` never matches). A `Match` is `(blockID, occurrenceIndex)` where `occurrenceIndex` counts occurrences *within the block*, across its fragments in order. Views then re-derive an `occurrenceOffset` per fragment (list item / table cell) so the "active" match can be highlighted in the right cell — fragment order in `searchableFragments` must stay in lockstep with render order in `MarkdownBlockView`.
@@ -93,7 +101,7 @@ The document menu's **Export** submenu offers Markdown / PDF / HTML; each writes
 
 ## Tests
 
-`MarginTests/MarkdownParserTests.swift` — swift-testing (`import Testing`, `@Test`, `#expect`), one file that currently covers the parser, statistics, search index, typography cascade, quick action, task toggler, share, and print renderer. Tests that touch `DocumentSharePresenter` etc. need `@MainActor`.
+`MarginTests/MarkdownParserTests.swift` — swift-testing (`import Testing`, `@Test`, `#expect`), one file that currently covers the parser, statistics, search index, typography cascade, quick action, task toggler, share, print renderer, and mermaid detection/bundling/export. Tests that touch `DocumentSharePresenter` etc. need `@MainActor`.
 
 ## Conventions
 

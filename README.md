@@ -11,6 +11,7 @@ Margin 是一个面向 iPhone 和 iPad 的原生 Markdown 阅读与编辑器。�
 - 可在首页选取 Claude 或 Typora GitHub 文稿主题，并在阅读设置中随时切换
 - Claude 主题使用 Anthropic Serif 拉丁字体与 Noto Serif SC 中文衬线回退，支持明暗配色
 - 标题、段落、引用、列表、任务、代码块、表格、图片、分隔线与 front matter 渲染
+- ` ```mermaid ` 代码块在阅读视图中渲染为图表，右上角的复制按钮相应变为“导出图片”，可分享带主题背景的 PNG
 - 原生 TextKit 编辑器，支持选区、撤销、动态字体和 Markdown 快捷工具条
 - 文档内搜索、标题目录跳转、字数 / 行数 / 阅读时长统计
 - 文稿标题菜单支持复制、移动、分享、重新命名与打印
@@ -28,6 +29,8 @@ xcodebuild -project Margin.xcodeproj -scheme Margin -sdk iphonesimulator build
 视觉迁移依据见 [`docs/claude-like-theme-spec.md`](docs/claude-like-theme-spec.md)。
 
 App 图标源文件为 `Margin/AppIcon.icon`；旧版扁平图标保存在 `docs/icon-source/AppIconLegacy.appiconset`，不参与构建。
+
+图表渲染内置 [mermaid](https://github.com/mermaid-js/mermaid)（MIT，见 `Margin/Resources/Mermaid/LICENSE-mermaid.txt`）离线脚本，随 App 打包，不访问网络。升级时替换 `Margin/Resources/Mermaid/mermaid.min.js` 即可。
 
 ## iCloud Drive
 

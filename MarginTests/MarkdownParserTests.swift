@@ -760,4 +760,98 @@ struct MarkdownParserTests {
         #expect(!html.contains("# Heading"))
         #expect(!html.contains("**bold**"))
     }
+
+    @Test func recognisesMermaidFencesByTheirInfostring() {
+        let source = """
+        ```mermaid
+        graph TD
+          A[Start] --> B[Done]
+        ```
+
+        ```swift
+        let value = 1
+        ```
+        """
+        let blocks = MarkdownParser.parse(source)
+        let languages = blocks.compactMap { block -> String? in
+            guard case let .code(language, _) = block.kind else { return nil }
+            return language
+        }
+
+        #expect(languages == ["mermaid", "swift"])
+        #expect(MermaidSupport.isMermaid(language: "mermaid"))
+        #expect(MermaidSupport.isMermaid(language: "Mermaid"))
+        // Extra words in the infostring still describe a diagram.
+        #expect(MermaidSupport.isMermaid(language: "mermaid theme=dark"))
+        #expect(!MermaidSupport.isMermaid(language: "swift"))
+        #expect(!MermaidSupport.isMermaid(language: "mermaidjs"))
+        #expect(!MermaidSupport.isMermaid(language: nil))
+        // The diagram source stays searchable even though it renders as a picture.
+        #expect(blocks.first?.searchableFragments.first?.contains("A[Start]") == true)
+    }
+
+    @Test @MainActor func diagramRenderKeysFollowThemeAppearanceAndTextSize() {
+        let claudeLight = MermaidStyle(
+            theme: MarkdownTheme(readerTheme: .claude, colorScheme: .light),
+            fontSize: 16
+        )
+        let claudeDark = MermaidStyle(
+            theme: MarkdownTheme(readerTheme: .claude, colorScheme: .dark),
+            fontSize: 16
+        )
+        let gitHubLight = MermaidStyle(
+            theme: MarkdownTheme(readerTheme: .github, colorScheme: .light),
+            fontSize: 16
+        )
+
+        #expect(claudeLight != claudeDark)
+        #expect(claudeLight != gitHubLight)
+        #expect(claudeLight.identity != claudeDark.identity)
+        #expect(
+            claudeLight == MermaidStyle(
+                theme: MarkdownTheme(readerTheme: .claude, colorScheme: .light),
+                fontSize: 16
+            )
+        )
+        // Text-size steps round together so the render cache is not fragmented
+        // by sizes that produce the same picture.
+        #expect(
+            claudeLight == MermaidStyle(
+                theme: MarkdownTheme(readerTheme: .claude, colorScheme: .light),
+                fontSize: 16.1
+            )
+        )
+    }
+
+    @Test @MainActor func exportsADiagramAsAPaddedOpaquePNG() throws {
+        let diagram = UIGraphicsImageRenderer(size: CGSize(width: 40, height: 30)).image { context in
+            UIColor.red.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 40, height: 30))
+        }
+
+        let data = try DiagramImageExporter.pngData(for: diagram, background: .white)
+        let exported = try #require(UIImage(data: data))
+        let padding = DiagramImageExporter.padding
+        // Exports render at the diagram's own scale, never below 2x, and a PNG
+        // decodes back at scale 1 — so the file is measured in pixels here.
+        let renderScale = max(diagram.scale, 2)
+
+        #expect(!data.isEmpty)
+        #expect(exported.size.width == (40 + padding * 2) * renderScale)
+        #expect(exported.size.height == (30 + padding * 2) * renderScale)
+    }
+
+    @Test func bundlesTheMermaidRenderingResources() throws {
+        let appBundle = try #require(Bundle(identifier: "com.fze.margin"))
+
+        #expect(appBundle.url(forResource: "mermaid-host", withExtension: "html") != nil)
+        #expect(appBundle.url(forResource: "mermaid.min", withExtension: "js") != nil)
+
+        let hostURL = try #require(appBundle.url(forResource: "mermaid-host", withExtension: "html"))
+        let host = try String(contentsOf: hostURL, encoding: .utf8)
+        // The renderer loads the host page from the bundle, so mermaid.js has to
+        // sit next to it rather than come off the network.
+        #expect(host.contains("src=\"mermaid.min.js\""))
+        #expect(host.contains("window.marginMermaid"))
+    }
 }

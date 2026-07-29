@@ -1,0 +1,106 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<style>
+  html, body { margin: 0; padding: 0; background: transparent; overflow: hidden; }
+  #stage { display: inline-block; }
+  #stage svg { display: block; max-width: none !important; }
+</style>
+<script src="mermaid.min.js"></script>
+<script>
+// Rendering host for MermaidRenderer. The native side calls render() with the
+// diagram source plus a mermaid config built from the reader theme, then
+// snapshots the web view at the size reported back here.
+window.marginMermaid = (function () {
+  var counter = 0;
+
+  function stage() {
+    return document.getElementById('stage');
+  }
+
+  // Mermaid sizes diagrams through viewBox; the width/height attributes carry
+  // its useMaxWidth behaviour, so the viewBox is the reliable intrinsic size.
+  function intrinsicSize(svg) {
+    var viewBox = svg.getAttribute('viewBox');
+    if (viewBox) {
+      var parts = viewBox.trim().split(/[\s,]+/).map(Number);
+      if (parts.length === 4 && parts[2] > 0 && parts[3] > 0) {
+        return { width: parts[2], height: parts[3] };
+      }
+    }
+    var box = svg.getBBox();
+    return { width: Math.max(box.width, 1), height: Math.max(box.height, 1) };
+  }
+
+  // A failed parse can leave mermaid's temporary measuring node behind.
+  function removeLeftovers() {
+    var leftovers = document.querySelectorAll('body > [id^="margin-diagram-"], body > [id^="dmargin-diagram-"]');
+    for (var index = 0; index < leftovers.length; index += 1) {
+      leftovers[index].remove();
+    }
+  }
+
+  function nextFrame() {
+    return new Promise(function (resolve) {
+      requestAnimationFrame(function () {
+        requestAnimationFrame(resolve);
+      });
+    });
+  }
+
+  async function render(code, config, scale, background) {
+    var host = stage();
+    host.innerHTML = '';
+    host.style.width = '';
+    host.style.height = '';
+    document.body.style.background = background || 'transparent';
+
+    counter += 1;
+    var id = 'margin-diagram-' + counter;
+    var result;
+    try {
+      mermaid.initialize(config);
+      await mermaid.parse(code);
+      result = await mermaid.render(id, code);
+    } catch (error) {
+      removeLeftovers();
+      throw new Error(error && error.message ? error.message : String(error));
+    }
+    removeLeftovers();
+
+    host.innerHTML = result.svg;
+    var svg = host.querySelector('svg');
+    if (!svg) {
+      throw new Error('mermaid produced no diagram');
+    }
+
+    var size = intrinsicSize(svg);
+    var width = Math.max(1, Math.ceil(size.width * scale));
+    var height = Math.max(1, Math.ceil(size.height * scale));
+    svg.removeAttribute('style');
+    svg.setAttribute('width', String(width));
+    svg.setAttribute('height', String(height));
+    host.style.width = width + 'px';
+    host.style.height = height + 'px';
+
+    // Let layout and font metrics settle before the native snapshot.
+    await nextFrame();
+    if (document.fonts && document.fonts.ready) {
+      await document.fonts.ready;
+    }
+    return { width: width, height: height };
+  }
+
+  function clear() {
+    stage().innerHTML = '';
+    removeLeftovers();
+  }
+
+  return { render: render, clear: clear };
+})();
+</script>
+</head>
+<body><div id="stage"></div></body>
+</html>

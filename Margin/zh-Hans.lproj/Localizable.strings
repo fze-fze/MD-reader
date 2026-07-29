@@ -124,3 +124,10 @@
 "reader.copy_code" = "复制代码";
 "reader.copy_success_hint" = "代码已复制到剪贴板";
 "reader.copy_hint" = "将代码复制到剪贴板";
+"reader.export_image" = "导出图片";
+"reader.export_image_failed" = "导出失败";
+"reader.export_image_hint" = "将图表导出为 PNG 图片";
+"reader.mermaid.accessibility" = "Mermaid 图表";
+"reader.mermaid.rendering" = "正在渲染图表";
+"reader.mermaid.error" = "无法渲染该图表。";
+"reader.mermaid.export_filename" = "图表";

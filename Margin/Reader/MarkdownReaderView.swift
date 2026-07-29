@@ -115,7 +115,17 @@ private struct MarkdownBlockView: View {
         case let .taskList(items):
             taskList(items)
         case let .code(language, source):
-            codeBlock(language: language, source: source)
+            if MermaidSupport.isMermaid(language: language) {
+                MermaidBlockView(
+                    source: source,
+                    bodySize: bodySize,
+                    theme: theme,
+                    searchText: searchText,
+                    activeOccurrenceIndex: activeOccurrenceIndex
+                )
+            } else {
+                codeBlock(language: language, source: source)
+            }
         case let .math(source):
             MathBlockView(
                 source: source,
