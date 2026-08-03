@@ -1,8 +1,20 @@
 import Foundation
 
 nonisolated struct MarkdownBlock: Identifiable, Equatable, Sendable {
+    // 0-based index of the block's first source line. Outline jumps and task
+    // toggling both key off this, so it must stay a line index.
     let id: Int
     let kind: Kind
+    // Every source line the block was built from. A paragraph joins its lines
+    // with " ", so writing an annotation back needs the full span, not just
+    // the first line.
+    let sourceLines: Range<Int>
+
+    init(id: Int, kind: Kind, sourceLines: Range<Int>? = nil) {
+        self.id = id
+        self.kind = kind
+        self.sourceLines = sourceLines ?? (id..<(id + 1))
+    }
 
     enum Kind: Equatable, Sendable {
         case heading(level: Int, text: String)
@@ -42,31 +54,13 @@ nonisolated struct MarkdownBlock: Identifiable, Equatable, Sendable {
         }
     }
 
-    // Inline math renders as an image, so searchable text replaces each
-    // formula with U+FFFC. The placeholder blocks queries from matching
-    // across a formula seam, keeping index match counts aligned with the
-    // per-segment highlighting the reader can actually draw.
+    // Search matches what the reader draws, so annotation markers and their
+    // comments are stripped alongside the rest of the inline syntax, and each
+    // inline formula collapses to U+FFFC. The placeholder blocks queries from
+    // matching across a formula seam, keeping index match counts aligned with
+    // the per-segment highlighting the reader can actually draw.
     private static func inlinePlainText(_ source: String) -> String {
-        InlineMathSegmenter.segments(in: source).map { segment in
-            switch segment {
-            case let .text(part):
-                plainMarkdownText(part)
-            case .math:
-                "\u{FFFC}"
-            }
-        }.joined()
-    }
-
-    private static func plainMarkdownText(_ source: String) -> String {
-        guard let attributed = try? AttributedString(
-            markdown: source,
-            options: AttributedString.MarkdownParsingOptions(
-                interpretedSyntax: .inlineOnlyPreservingWhitespace
-            )
-        ) else {
-            return source
-        }
-        return String(attributed.characters)
+        InlinePlainText.render(source)
     }
 }
 

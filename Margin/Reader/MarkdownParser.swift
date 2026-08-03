@@ -9,7 +9,7 @@ nonisolated enum MarkdownParser {
         if lines.first?.trimmingCharacters(in: .whitespaces) == "---",
            let closing = lines.dropFirst().firstIndex(where: { $0.trimmingCharacters(in: .whitespaces) == "---" }) {
             let content = lines[1..<closing].joined(separator: "\n")
-            blocks.append(MarkdownBlock(id: 0, kind: .frontMatter(content)))
+            blocks.append(MarkdownBlock(id: 0, kind: .frontMatter(content), sourceLines: 0..<(closing + 1)))
             index = closing + 1
         }
 
@@ -35,13 +35,18 @@ nonisolated enum MarkdownParser {
                 if index < lines.count { index += 1 }
                 blocks.append(MarkdownBlock(
                     id: start,
-                    kind: .code(language: languageText.isEmpty ? nil : languageText, source: codeLines.joined(separator: "\n"))
+                    kind: .code(language: languageText.isEmpty ? nil : languageText, source: codeLines.joined(separator: "\n")),
+                    sourceLines: start..<index
                 ))
                 continue
             }
 
             if let math = mathBlock(at: index, lines: lines) {
-                blocks.append(MarkdownBlock(id: index, kind: .math(source: math.source)))
+                blocks.append(MarkdownBlock(
+                    id: index,
+                    kind: .math(source: math.source),
+                    sourceLines: index..<math.nextIndex
+                ))
                 index = math.nextIndex
                 continue
             }
@@ -67,7 +72,11 @@ nonisolated enum MarkdownParser {
                     quoteLines.append(String(value.dropFirst()).trimmingCharacters(in: .whitespaces))
                     index += 1
                 }
-                blocks.append(MarkdownBlock(id: start, kind: .blockquote(quoteLines.joined(separator: "\n"))))
+                blocks.append(MarkdownBlock(
+                    id: start,
+                    kind: .blockquote(quoteLines.joined(separator: "\n")),
+                    sourceLines: start..<index
+                ))
                 continue
             }
 
@@ -78,7 +87,11 @@ nonisolated enum MarkdownParser {
             }
 
             if let table = table(at: index, lines: lines) {
-                blocks.append(MarkdownBlock(id: index, kind: .table(headers: table.headers, rows: table.rows)))
+                blocks.append(MarkdownBlock(
+                    id: index,
+                    kind: .table(headers: table.headers, rows: table.rows),
+                    sourceLines: index..<table.nextIndex
+                ))
                 index = table.nextIndex
                 continue
             }
@@ -97,7 +110,7 @@ nonisolated enum MarkdownParser {
                 case .ordered: .orderedList(items)
                 case .task: .taskList(items)
                 }
-                blocks.append(MarkdownBlock(id: start, kind: kind))
+                blocks.append(MarkdownBlock(id: start, kind: kind, sourceLines: start..<index))
                 continue
             }
 
@@ -118,7 +131,11 @@ nonisolated enum MarkdownParser {
                 paragraph.append(candidate)
                 index += 1
             }
-            blocks.append(MarkdownBlock(id: start, kind: .paragraph(paragraph.joined(separator: " "))))
+            blocks.append(MarkdownBlock(
+                id: start,
+                kind: .paragraph(paragraph.joined(separator: " ")),
+                sourceLines: start..<index
+            ))
         }
 
         return blocks

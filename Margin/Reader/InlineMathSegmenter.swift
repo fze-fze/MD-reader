@@ -6,18 +6,30 @@ nonisolated enum InlineMathSegmenter {
         case math(latex: String, isDisplay: Bool)
     }
 
+    // A segment together with the character offsets it occupies in the scanned
+    // string. Mapping a rendered offset back to a source offset needs the
+    // ranges; rendering only needs the segments.
+    struct RangedSegment: Equatable, Sendable {
+        let segment: Segment
+        let sourceRange: Range<Int>
+    }
+
     // Segmenting copies the string into an array and scans it. The reader
     // re-runs it on every body evaluation of every visible block, so memoize
     // the pure result. Text without a "$" short-circuits before the lock,
     // which is the overwhelmingly common case.
     private static let cacheLock = NSLock()
-    nonisolated(unsafe) private static var cache: [String: [Segment]] = [:]
+    nonisolated(unsafe) private static var cache: [String: [RangedSegment]] = [:]
 
     // Inline math is $…$ only; display $$ is a block-level construct handled
     // by MarkdownParser, so a mid-sentence $$ stays literal text.
     static func segments(in source: String) -> [Segment] {
+        rangedSegments(in: source).map(\.segment)
+    }
+
+    static func rangedSegments(in source: String) -> [RangedSegment] {
         guard source.contains("$") else {
-            return [.text(source)]
+            return [RangedSegment(segment: .text(source), sourceRange: 0..<source.count)]
         }
 
         if let cached = cacheLock.withLock({ cache[source] }) {
@@ -38,20 +50,24 @@ nonisolated enum InlineMathSegmenter {
         cacheLock.withLock { cache.removeAll() }
     }
 
-    private static func computeSegments(in source: String) -> [Segment] {
+    private static func computeSegments(in source: String) -> [RangedSegment] {
         let characters = Array(source)
-        var segments: [Segment] = []
+        var segments: [RangedSegment] = []
         var textBuffer = ""
+        var textStart = 0
         var index = 0
 
-        func flushText() {
+        func flushText(upTo end: Int) {
             guard !textBuffer.isEmpty else { return }
-            segments.append(.text(textBuffer))
+            segments.append(
+                RangedSegment(segment: .text(textBuffer), sourceRange: textStart..<end)
+            )
             textBuffer = ""
         }
 
         while index < characters.count {
             let character = characters[index]
+            if textBuffer.isEmpty { textStart = index }
 
             if character == "\\", index + 1 < characters.count {
                 // Escapes (\$, \\, …) stay literal text.
@@ -63,14 +79,9 @@ nonisolated enum InlineMathSegmenter {
 
             // Inline code spans win over math: `$x` is code, not a formula.
             if character == "`" {
-                let fenceLength = runLength(of: "`", in: characters, from: index)
-                if let close = closingBacktickRun(length: fenceLength, in: characters, from: index + fenceLength) {
-                    textBuffer.append(contentsOf: characters[index..<(close + fenceLength)])
-                    index = close + fenceLength
-                } else {
-                    textBuffer.append(contentsOf: characters[index..<(index + fenceLength)])
-                    index += fenceLength
-                }
+                let end = InlineScanning.endOfCodeSpan(in: characters, from: index)
+                textBuffer.append(contentsOf: characters[index..<end])
+                index = end
                 continue
             }
 
@@ -82,11 +93,16 @@ nonisolated enum InlineMathSegmenter {
                 }
 
                 if let close = closingSingleDollar(in: characters, from: index) {
-                    flushText()
-                    segments.append(.math(
-                        latex: trimmedLatex(characters[(index + 1)..<close]),
-                        isDisplay: false
-                    ))
+                    flushText(upTo: index)
+                    segments.append(
+                        RangedSegment(
+                            segment: .math(
+                                latex: trimmedLatex(characters[(index + 1)..<close]),
+                                isDisplay: false
+                            ),
+                            sourceRange: index..<(close + 1)
+                        )
+                    )
                     index = close + 1
                     continue
                 }
@@ -96,34 +112,14 @@ nonisolated enum InlineMathSegmenter {
             index += 1
         }
 
-        flushText()
-        return segments.isEmpty ? [.text("")] : segments
+        flushText(upTo: characters.count)
+        return segments.isEmpty
+            ? [RangedSegment(segment: .text(""), sourceRange: 0..<0)]
+            : segments
     }
 
     private static func trimmedLatex(_ slice: ArraySlice<Character>) -> String {
         String(slice).trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private static func runLength(of character: Character, in characters: [Character], from index: Int) -> Int {
-        var length = 0
-        while index + length < characters.count, characters[index + length] == character {
-            length += 1
-        }
-        return length
-    }
-
-    private static func closingBacktickRun(length: Int, in characters: [Character], from index: Int) -> Int? {
-        var cursor = index
-        while cursor < characters.count {
-            if characters[cursor] == "`" {
-                let run = runLength(of: "`", in: characters, from: cursor)
-                if run == length { return cursor }
-                cursor += run
-            } else {
-                cursor += 1
-            }
-        }
-        return nil
     }
 
     // Pandoc-style heuristics keep prices like "$5 和 $10" out of math mode:

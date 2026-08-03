@@ -7,6 +7,8 @@ final class MarginAppDelegate: NSObject, UIApplicationDelegate {
     func applicationDidReceiveMemoryWarning(_ application: UIApplication) {
         MathRenderer.purgeCache()
         InlineMarkdownStyler.purgeCache()
+        InlineMarkdownUIText.purgeCache()
         InlineMathSegmenter.purgeCache()
+        AnnotationSegmenter.purgeCache()
     }
 }

@@ -94,16 +94,16 @@ private struct MarkdownBlockView: View {
         case let .heading(level, text):
             heading(level: level, text: text)
         case let .paragraph(text):
-            InlineMarkdownText(
+            SelectableInlineText(
                 source: text,
-                fonts: inlineFonts(size: bodySize),
+                fonts: inlineUIFonts(size: bodySize),
                 mathFontSize: bodySize,
-                foregroundStyle: theme.textPrimary,
+                foregroundColor: UIColor(theme.textPrimary),
                 theme: theme,
                 searchText: searchText,
-                activeOccurrenceIndex: activeOccurrenceIndex
+                activeOccurrenceIndex: activeOccurrenceIndex,
+                lineSpacing: bodySize * 0.38
             )
-            .lineSpacing(bodySize * 0.38)
             .padding(.vertical, bodySize * 0.39)
             .accessibilityElement(children: .contain)
         case let .blockquote(text):
@@ -139,16 +139,16 @@ private struct MarkdownBlockView: View {
 
     private func heading(level: Int, text: String) -> some View {
         let multiplier = theme.headingScale(level: level)
-        return InlineMarkdownText(
+        return SelectableInlineText(
             source: text,
-            fonts: inlineFonts(size: bodySize * multiplier, weight: .semibold),
+            fonts: inlineUIFonts(size: bodySize * multiplier, weight: .semibold),
             mathFontSize: bodySize * multiplier,
-            foregroundStyle: level == 6 ? theme.textSecondary : theme.textStrong,
+            foregroundColor: UIColor(level == 6 ? theme.textSecondary : theme.textStrong),
             theme: theme,
             searchText: searchText,
-            activeOccurrenceIndex: activeOccurrenceIndex
+            activeOccurrenceIndex: activeOccurrenceIndex,
+            lineSpacing: bodySize * 0.16
         )
-        .lineSpacing(bodySize * 0.16)
         .padding(.top, level == 1 ? bodySize * 0.35 : bodySize * 1.45)
         .padding(.bottom, bodySize * 0.35)
         .accessibilityAddTraits(.isHeader)
@@ -159,16 +159,16 @@ private struct MarkdownBlockView: View {
             Rectangle()
                 .fill(theme.quoteRule)
                 .frame(width: 2)
-            InlineMarkdownText(
+            SelectableInlineText(
                 source: text,
-                fonts: inlineFonts(size: bodySize),
+                fonts: inlineUIFonts(size: bodySize),
                 mathFontSize: bodySize,
-                foregroundStyle: theme.quoteText,
+                foregroundColor: UIColor(theme.quoteText),
                 theme: theme,
                 searchText: searchText,
-                activeOccurrenceIndex: activeOccurrenceIndex
+                activeOccurrenceIndex: activeOccurrenceIndex,
+                lineSpacing: bodySize * 0.38
             )
-            .lineSpacing(bodySize * 0.38)
             .padding(.horizontal, 16)
             .padding(.vertical, 9)
         }
@@ -181,7 +181,7 @@ private struct MarkdownBlockView: View {
 
     private func list(_ items: [MarkdownListItem], ordered: Bool) -> some View {
         let offsets = fragmentOccurrenceOffsets
-        let itemFonts = inlineFonts(size: bodySize)
+        let itemFonts = inlineUIFonts(size: bodySize)
         return VStack(alignment: .leading, spacing: 7) {
             ForEach(items.enumerated(), id: \.element.id) { itemIndex, item in
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -189,17 +189,17 @@ private struct MarkdownBlockView: View {
                         .font(documentFont(size: bodySize))
                         .foregroundStyle(theme.textSecondary)
                         .frame(minWidth: 20, alignment: .trailing)
-                    InlineMarkdownText(
+                    SelectableInlineText(
                         source: item.text,
                         fonts: itemFonts,
                         mathFontSize: bodySize,
-                        foregroundStyle: theme.textPrimary,
+                        foregroundColor: UIColor(theme.textPrimary),
                         theme: theme,
                         searchText: searchText,
                         activeOccurrenceIndex: activeOccurrenceIndex,
-                        occurrenceOffset: occurrenceOffset(offsets, itemIndex)
+                        occurrenceOffset: occurrenceOffset(offsets, itemIndex),
+                        lineSpacing: bodySize * 0.38
                     )
-                    .lineSpacing(bodySize * 0.38)
                 }
             }
         }
@@ -209,7 +209,7 @@ private struct MarkdownBlockView: View {
 
     private func taskList(_ items: [MarkdownListItem]) -> some View {
         let offsets = fragmentOccurrenceOffsets
-        let itemFonts = inlineFonts(size: bodySize)
+        let itemFonts = inlineUIFonts(size: bodySize)
         return VStack(alignment: .leading, spacing: 4) {
             ForEach(items.enumerated(), id: \.element.id) { itemIndex, item in
                 HStack(alignment: .center, spacing: 0) {
@@ -245,11 +245,11 @@ private struct MarkdownBlockView: View {
                     )
                     .sensoryFeedback(.selection, trigger: item.isChecked)
 
-                    InlineMarkdownText(
+                    SelectableInlineText(
                         source: item.text,
                         fonts: itemFonts,
                         mathFontSize: bodySize,
-                        foregroundStyle: theme.textPrimary,
+                        foregroundColor: UIColor(theme.textPrimary),
                         theme: theme,
                         searchText: searchText,
                         activeOccurrenceIndex: activeOccurrenceIndex,
@@ -303,43 +303,33 @@ private struct MarkdownBlockView: View {
 
     private func table(headers: [String], rows: [[String]]) -> some View {
         let offsets = fragmentOccurrenceOffsets
-        let headerFonts = inlineFonts(size: bodySize * 0.93, weight: .semibold)
-        let cellFonts = inlineFonts(size: bodySize * 0.93)
+        let headerFonts = inlineUIFonts(size: bodySize * 0.93, weight: .semibold)
+        let cellFonts = inlineUIFonts(size: bodySize * 0.93)
         return ScrollView(.horizontal) {
             Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 0) {
                 GridRow {
                     ForEach(headers.enumerated(), id: \.offset) { columnIndex, value in
-                        InlineMarkdownText(
-                            source: value,
+                        tableCell(
+                            value: value,
                             fonts: headerFonts,
-                            mathFontSize: bodySize * 0.93,
-                            foregroundStyle: theme.textStrong,
-                            theme: theme,
-                            searchText: searchText,
-                            activeOccurrenceIndex: activeOccurrenceIndex,
+                            foregroundColor: UIColor(theme.textStrong),
                             occurrenceOffset: occurrenceOffset(offsets, columnIndex)
                         )
-                        .padding(.vertical, 12)
                     }
                 }
                 Divider().overlay(theme.tableStrongRule)
                 ForEach(rows.enumerated(), id: \.offset) { rowIndex, row in
                     GridRow {
                         ForEach(row.enumerated(), id: \.offset) { columnIndex, value in
-                            InlineMarkdownText(
-                                source: value,
+                            tableCell(
+                                value: value,
                                 fonts: cellFonts,
-                                mathFontSize: bodySize * 0.93,
-                                foregroundStyle: theme.textPrimary,
-                                theme: theme,
-                                searchText: searchText,
-                                activeOccurrenceIndex: activeOccurrenceIndex,
+                                foregroundColor: UIColor(theme.textPrimary),
                                 occurrenceOffset: occurrenceOffset(
                                     offsets,
                                     headers.count + rowIndex * headers.count + columnIndex
                                 )
                             )
-                            .padding(.vertical, 12)
                         }
                     }
                     if rowIndex < rows.count - 1 {
@@ -360,6 +350,30 @@ private struct MarkdownBlockView: View {
                 Int64(rows.count)
             )
         )
+    }
+
+    // A single table cell. Selectable and copyable like body text, but sized to
+    // its content so the column widths still track the longest cell, and marked
+    // out of the annotation scope (tables are not annotatable in v1).
+    private func tableCell(
+        value: String,
+        fonts: InlineMarkdownUIFonts,
+        foregroundColor: UIColor,
+        occurrenceOffset: Int
+    ) -> some View {
+        SelectableInlineText(
+            source: value,
+            fonts: fonts,
+            mathFontSize: bodySize * 0.93,
+            foregroundColor: foregroundColor,
+            theme: theme,
+            searchText: searchText,
+            activeOccurrenceIndex: activeOccurrenceIndex,
+            occurrenceOffset: occurrenceOffset,
+            allowsAnnotation: false,
+            sizingMode: .intrinsic
+        )
+        .padding(.vertical, 12)
     }
 
     private func frontMatter(_ source: String) -> some View {
@@ -461,6 +475,17 @@ private struct MarkdownBlockView: View {
         weight: UIFont.Weight = .regular
     ) -> InlineMarkdownFonts {
         MarkdownTypography.inlineFonts(
+            theme: theme.readerTheme,
+            size: size,
+            weight: weight
+        )
+    }
+
+    private func inlineUIFonts(
+        size: Double,
+        weight: UIFont.Weight = .regular
+    ) -> InlineMarkdownUIFonts {
+        MarkdownTypography.inlineUIFonts(
             theme: theme.readerTheme,
             size: size,
             weight: weight
