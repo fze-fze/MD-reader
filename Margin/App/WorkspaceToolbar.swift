@@ -1,10 +1,15 @@
 import SwiftUI
 
-struct PagesWorkspaceToolbar: View {
+/// The app's own controls inside the system document navigation bar.
+///
+/// The bar, the back button, and the file-name title menu are DocumentGroup's
+/// (`.toolbarRole(.editor)` gives them the Pages-style editor layout) — the same
+/// chrome `UIDocumentViewController` builds from the open document. Everything
+/// here is what Margin adds on the trailing side, so nothing depends on what
+/// the system title menu happens to contain.
+struct WorkspaceToolbarContent: ToolbarContent {
     let mode: WorkspaceMode
     let documentName: String
-    let accent: Color
-    let glassTint: Color
     let onSearch: () -> Void
     let onToggleMode: () -> Void
     let onSettings: () -> Void
@@ -14,48 +19,34 @@ struct PagesWorkspaceToolbar: View {
     let canMove: Bool
     let canRename: Bool
 
-    var body: some View {
-        HStack(spacing: 2) {
-            // A Button's tap target is its label, so the 44pt frame (and the
-            // hit shape covering it) must live inside the label — outside the
-            // button it only reserves layout space around a glyph-sized target.
+    var body: some ToolbarContent {
+        ToolbarItem(placement: .topBarTrailing) {
             Button(action: onSearch) {
                 Label("workspace.search", systemImage: "magnifyingglass")
-                    .frame(width: 44, height: 44)
-                    .contentShape(.rect)
             }
             .keyboardShortcut("f", modifiers: .command)
+        }
 
+        ToolbarItem(placement: .topBarTrailing) {
             Button(action: onToggleMode) {
                 Label(
                     mode == .read ? "workspace.edit" : "common.done",
                     systemImage: mode == .read ? "square.and.pencil" : "checkmark.circle.fill"
                 )
-                .font(.title2.bold())
-                .frame(width: 44, height: 44)
-                .contentShape(.rect)
             }
-            .foregroundStyle(accent)
+        }
 
+        ToolbarItem(placement: .topBarTrailing) {
             documentMenu
         }
-        .labelStyle(.iconOnly)
-        .font(.title3)
-        .buttonStyle(.plain)
-        .frame(minHeight: 44)
-        .padding(.horizontal, 6)
-        .glassEffect(
-            .regular.tint(glassTint).interactive(),
-            in: .capsule
-        )
     }
 
-    // Pages-style document menu: an icon button in the bar; the file name
-    // lives inside the menu as its topmost header, so the bar itself never
-    // shows a (potentially stale) title.
+    // Reading and file actions live here rather than in the title menu: that
+    // menu is the system's, built from the open document, and overriding it
+    // would trade away rename, drag, and the document header preview.
     private var documentMenu: some View {
         Menu {
-            Section(documentName) {
+            Section {
                 Button("workspace.outline", systemImage: "list.bullet.indent", action: onOutline)
                 Button("workspace.document_info", systemImage: "info.circle", action: onDocumentInfo)
                 Button("workspace.reader_settings", systemImage: "paintbrush", action: onSettings)
@@ -93,8 +84,6 @@ struct PagesWorkspaceToolbar: View {
             }
         } label: {
             Label("workspace.more", systemImage: "ellipsis")
-                .frame(width: 44, height: 44)
-                .contentShape(.rect)
         }
         .accessibilityLabel(L10n.format("workspace.document_menu_accessibility", documentName))
     }

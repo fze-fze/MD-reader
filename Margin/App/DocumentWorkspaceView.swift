@@ -24,7 +24,6 @@ struct DocumentWorkspaceView: View {
 
     @Environment(\.colorScheme) private var systemColorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.dismiss) private var dismiss
 
     init(text: Binding<String>, fileURL: URL?) {
         _text = text
@@ -79,15 +78,17 @@ struct DocumentWorkspaceView: View {
             }
         }
         .environment(\.colorScheme, resolvedColorScheme)
-        .toolbarVisibility(.hidden, for: .navigationBar)
-        .background(DocumentNavigationBarHider())
-        .background(InteractivePopGestureRestorer())
-        .safeAreaInset(edge: .top, spacing: 0) {
-            PagesDocumentNavigationBar(
+        // DocumentGroup's own bar is the document chrome: its back button,
+        // file name, and title menu are built from the open document, already
+        // in the Pages-style editor layout. Hiding it and drawing a
+        // replacement is what left a second bar on screen when another app
+        // opened a file. `.toolbarRole` is deliberately not set — DocumentGroup
+        // picks the role itself, and overriding it has produced a duplicate
+        // back button on iPad.
+        .toolbar {
+            WorkspaceToolbarContent(
                 mode: mode,
                 documentName: displayName,
-                theme: theme,
-                onDismiss: dismissWorkspace,
                 onSearch: presentSearch,
                 onToggleMode: toggleWorkspaceMode,
                 onSettings: presentSettings,
@@ -98,6 +99,8 @@ struct DocumentWorkspaceView: View {
                 canRename: effectiveFileURL != nil
             )
         }
+        .tint(theme.accent)
+        .background(InteractivePopGestureRestorer())
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if mode == .read, isSearchPresented {
                 DocumentSearchBar(
@@ -136,10 +139,6 @@ struct DocumentWorkspaceView: View {
         )
         .sensoryFeedback(.selection, trigger: mode)
         .preferredColorScheme(appearance.colorScheme)
-    }
-
-    private func dismissWorkspace() {
-        dismiss()
     }
 
     private func toggleWorkspaceMode() {

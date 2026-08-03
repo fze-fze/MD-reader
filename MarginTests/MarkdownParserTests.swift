@@ -472,38 +472,6 @@ struct MarkdownParserTests {
         )
     }
 
-    @Test @MainActor func hidesADocumentNavigationBarLeftVisibleByAnExternalOpen() {
-        let hider = DocumentNavigationBarHider.Controller()
-        let host = UIViewController()
-        host.addChild(hider)
-        host.view.addSubview(hider.view)
-        hider.didMove(toParent: host)
-        let navigation = UINavigationController(rootViewController: host)
-        navigation.setNavigationBarHidden(false, animated: false)
-
-        hider.hideNavigationBars()
-        #expect(navigation.isNavigationBarHidden)
-
-        // Hiding is idempotent, and leaving the document puts the bar back.
-        hider.hideNavigationBars()
-        hider.restoreNavigationBars()
-        #expect(!navigation.isNavigationBarHidden)
-    }
-
-    @Test @MainActor func leavesAnAlreadyHiddenNavigationBarAlone() {
-        let hider = DocumentNavigationBarHider.Controller()
-        let host = UIViewController()
-        host.addChild(hider)
-        host.view.addSubview(hider.view)
-        hider.didMove(toParent: host)
-        let navigation = UINavigationController(rootViewController: host)
-        navigation.setNavigationBarHidden(true, animated: false)
-
-        hider.hideNavigationBars()
-        hider.restoreNavigationBars()
-        #expect(navigation.isNavigationBarHidden)
-    }
-
     @Test @MainActor func validatesDocumentNamesBeforeRenaming() {
         #expect(DocumentRenamer.isValidName("Notes"))
         #expect(!DocumentRenamer.isValidName("   "))
