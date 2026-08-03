@@ -35,7 +35,7 @@ enum DocumentPDFExporter {
         theme: ReaderTheme,
         baseURL: URL?
     ) async throws -> Data {
-        let html = MarkdownPrintRenderer.html(
+        let html = await MarkdownPrintRenderer.preparedHTML(
             source: text,
             title: title,
             theme: theme,

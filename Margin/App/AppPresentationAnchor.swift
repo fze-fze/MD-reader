@@ -2,13 +2,16 @@ import UIKit
 
 @MainActor
 enum AppPresentationAnchor {
-    static var rootViewController: UIViewController? {
+    static var keyWindow: UIWindow? {
         UIApplication.shared.connectedScenes
             .compactMap { $0 as? UIWindowScene }
             .filter { $0.activationState == .foregroundActive }
             .flatMap(\.windows)
-            .first(where: \.isKeyWindow)?
-            .rootViewController
+            .first(where: \.isKeyWindow)
+    }
+
+    static var rootViewController: UIViewController? {
+        keyWindow?.rootViewController
     }
 
     static var topViewController: UIViewController? {

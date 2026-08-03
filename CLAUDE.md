@@ -59,6 +59,16 @@ Rendering is native via the **SwiftMath** SPM package (the project's only depend
 
 Search: inline math becomes U+FFFC in `searchableFragments` so index match counts stay aligned with per-segment highlighting; block math is searchable by its raw LaTeX. Print embeds formulas as base64 `<img>` data URIs (`MarkdownPrintRenderer.mathImageTag`, sized in `pt`, inline images baseline-shifted by the descent); invalid LaTeX prints as raw `$$…$$`.
 
+### Mermaid diagrams
+
+A ` ```mermaid ` fence stays a `MarkdownBlock.Kind.code` block (`MermaidSupport.isMermaid` reads the first infostring token) but renders as `MermaidBlockView` instead of source, and its copy button becomes **导出图片 / Export Image** (`DiagramExportImageButton` → `DiagramImageExporter.pngData`, which draws the diagram over `theme.codeFill` with padding so the shared PNG is opaque).
+
+There is no native mermaid renderer, so `MermaidRenderer` (`@MainActor`, singleton) drives the bundled **mermaid.js** (`Margin/Resources/Mermaid/mermaid.min.js`, MIT, loaded by `mermaid-host.html` — everything is offline, nothing is fetched) in **one** offscreen `WKWebView` living at the back of the key window, because WebKit only renders — and only snapshots — a web view that is in a window. `mermaid-host.html`'s `render()` lays the diagram out, forces explicit `width`/`height` from the SVG `viewBox` (mermaid's `useMaxWidth` otherwise reports 100%), and returns the intrinsic size; the renderer resizes the web view to that size, calls `takeSnapshot`, and caches the `UIImage` keyed by `MermaidStyle` (theme × appearance × rounded text size) + source. Views read the cache synchronously in their body like `MathRenderer`, so scrolling never touches the web view; oversized diagrams are laid out a second time at a smaller scale rather than snapshotted huge, renders are serialized through one task chain because the stage element is shared, and `purge()` (memory warning) drops the images *and* the web view. Mermaid runs with `securityLevel: 'strict'` — documents are untrusted input. Only a diagram mermaid refuses to parse caches its failure; those blocks fall back to the source plus the parser's message, with the copy button back.
+
+Diagram colors come from `MarkdownTheme` tokens converted to hex `themeVariables` (mermaid `theme: 'base'`), so diagrams follow the reader theme and appearance.
+
+Print, PDF and HTML export embed the same pictures as base64 `<img class="diagram">` data URIs. `MarkdownPrintRenderer.html` stays a pure synchronous function, so every print path goes through `preparedHTML` instead, which awaits `MermaidRenderer.prepare` for the document's `diagramSources` first — always at `diagramStyle(for:)` (the light palette, matching print). A diagram that is not in the cache by then simply prints as its fenced source, so a failed or skipped render never leaves a hole in the page.
+
 ### Search
 
 `DocumentSearchIndex` is built from each block's `searchableFragments` (markdown syntax stripped, so `**` never matches). A `Match` is `(blockID, occurrenceIndex)` where `occurrenceIndex` counts occurrences *within the block*, across its fragments in order. Views then re-derive an `occurrenceOffset` per fragment (list item / table cell) so the "active" match can be highlighted in the right cell — fragment order in `searchableFragments` must stay in lockstep with render order in `MarkdownBlockView`.
@@ -87,13 +97,13 @@ Persistence is three `@AppStorage` keys, declared in `DocumentWorkspaceView`: `r
 
 ### Printing
 
-`DocumentPrinter` → `MarkdownPrintRenderer.html(source:title:theme:)` produces standalone styled HTML (escaping is hand-rolled and tested) → `UIPrintInteractionController`. The HTML follows the current `ReaderTheme` — per-theme `Palette` drives fonts, colors, and heading scale, and math images render with the theme's math font; print always uses the light palette.
+`DocumentPrinter` → `MarkdownPrintRenderer.preparedHTML(source:title:theme:)` produces standalone styled HTML (escaping is hand-rolled and tested) → `UIPrintInteractionController`. `preparedHTML` is `async` only because mermaid diagrams have to be rendered before the markup is built; the HTML itself is still built by the pure `html(…)`, which is what the tests call. The HTML follows the current `ReaderTheme` — per-theme `Palette` drives fonts, colors, and heading scale, and math images render with the theme's math font; print always uses the light palette.
 
 The document menu's **Export** submenu offers Markdown / PDF / HTML; each writes a temporary file via `DocumentSharePresenter.makeTemporaryFile` and hands it to the share sheet (there is no separate "Share" item — Markdown export replaces it). `DocumentPDFExporter` reuses that same HTML for the PDF format, then shares the file via `DocumentSharePresenter`. It paginates a **`WKWebView`** (loaded and awaited) rather than a `UIMarkupTextPrintFormatter`, because the formatter paginates before the base64 `data:` URI images finish loading and silently drops every formula and task checkbox. The stylesheet's `print-color-adjust: exact` is what keeps WebKit from stripping background fills in that path.
 
 ## Tests
 
-`MarginTests/MarkdownParserTests.swift` — swift-testing (`import Testing`, `@Test`, `#expect`), one file that currently covers the parser, statistics, search index, typography cascade, quick action, task toggler, share, and print renderer. Tests that touch `DocumentSharePresenter` etc. need `@MainActor`.
+`MarginTests/MarkdownParserTests.swift` — swift-testing (`import Testing`, `@Test`, `#expect`), one file that currently covers the parser, statistics, search index, typography cascade, quick action, task toggler, share, print renderer, and mermaid detection/bundling/export. Tests that touch `DocumentSharePresenter` etc. need `@MainActor`.
 
 ## Conventions
 

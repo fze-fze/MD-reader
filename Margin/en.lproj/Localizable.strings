@@ -124,3 +124,10 @@
 "reader.copy_code" = "Copy code";
 "reader.copy_success_hint" = "Code copied to the clipboard";
 "reader.copy_hint" = "Copy code to the clipboard";
+"reader.export_image" = "Export Image";
+"reader.export_image_failed" = "Export failed";
+"reader.export_image_hint" = "Export the diagram as a PNG image";
+"reader.mermaid.accessibility" = "Mermaid diagram";
+"reader.mermaid.rendering" = "Rendering diagram";
+"reader.mermaid.error" = "This diagram could not be rendered.";
+"reader.mermaid.export_filename" = "Diagram";
