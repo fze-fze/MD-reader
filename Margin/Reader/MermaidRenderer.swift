@@ -41,6 +41,11 @@ final class MermaidRenderer {
     // container (gantt, timeline) take its width — 960 keeps those readable
     // once the reader scales them down to its column.
     private let renderViewportSize = CGSize(width: 960, height: 960)
+    // Far enough left that no part of the render view overlaps the window on any
+    // device, so it never shows through the app's own content.
+    private var offscreenOrigin: CGPoint {
+        CGPoint(x: -renderViewportSize.width, y: 0)
+    }
     private let maximumDiagramDimension: CGFloat = 2_600
     private let cacheLimit = 24
 
@@ -126,7 +131,7 @@ final class MermaidRenderer {
         guard !trimmed.isEmpty else { throw Failure.invalidDiagram("") }
 
         let webView = try await readyWebView()
-        webView.frame = CGRect(origin: .zero, size: renderViewportSize)
+        webView.frame = CGRect(origin: offscreenOrigin, size: renderViewportSize)
 
         let theme = MarkdownTheme(readerTheme: style.readerTheme, colorScheme: style.colorScheme)
         let configuration = mermaidConfiguration(style: style, theme: theme)
@@ -153,7 +158,7 @@ final class MermaidRenderer {
             )
         }
 
-        webView.frame = CGRect(origin: .zero, size: size)
+        webView.frame = CGRect(origin: offscreenOrigin, size: size)
         webView.setNeedsLayout()
         webView.layoutIfNeeded()
         // The resized viewport reaches the web content process asynchronously.
@@ -282,8 +287,10 @@ final class MermaidRenderer {
     }
 
     // WebKit only renders — and therefore only snapshots — a web view that
-    // lives in a window, so it sits at the very back of the key window where
-    // the app's own content covers it.
+    // lives in a window, so the renderer keeps one parked just past the key
+    // window's leading edge: on screen enough for WebKit, never visible to the
+    // reader. Hiding it by alpha instead would ruin every diagram, because
+    // takeSnapshot bakes the view's own alpha into the image it hands back.
     private func makeWebView() throws -> WKWebView {
         guard let window = AppPresentationAnchor.keyWindow else {
             throw Failure.unavailable
@@ -294,7 +301,7 @@ final class MermaidRenderer {
         configuration.suppressesIncrementalRendering = true
 
         let webView = WKWebView(
-            frame: CGRect(origin: .zero, size: renderViewportSize),
+            frame: CGRect(origin: offscreenOrigin, size: renderViewportSize),
             configuration: configuration
         )
         webView.isOpaque = false
@@ -304,7 +311,6 @@ final class MermaidRenderer {
         webView.scrollView.contentInsetAdjustmentBehavior = .never
         webView.isUserInteractionEnabled = false
         webView.autoresizingMask = []
-        webView.alpha = 0.01
         window.insertSubview(webView, at: 0)
         return webView
     }
