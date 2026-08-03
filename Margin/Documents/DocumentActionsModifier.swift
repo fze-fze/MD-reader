@@ -79,12 +79,14 @@ struct DocumentActionsModifier: ViewModifier {
         case let .export(format):
             exportDocument(as: format)
         case .print:
-            DocumentPrinter.present(
-                text: text,
-                title: displayName,
-                theme: readerTheme,
-                baseURL: fileURL?.deletingLastPathComponent()
-            )
+            Task { @MainActor in
+                await DocumentPrinter.present(
+                    text: text,
+                    title: displayName,
+                    theme: readerTheme,
+                    baseURL: fileURL?.deletingLastPathComponent()
+                )
+            }
         }
     }
 
@@ -107,7 +109,7 @@ struct DocumentActionsModifier: ViewModifier {
                         baseURL: fileURL?.deletingLastPathComponent()
                     )
                 case .html:
-                    let html = MarkdownPrintRenderer.html(
+                    let html = await MarkdownPrintRenderer.preparedHTML(
                         source: text,
                         title: displayName,
                         theme: readerTheme,

@@ -84,6 +84,38 @@ enum MarkdownPrintRenderer {
         }
     }
 
+    // Mermaid renders in a web view, so it cannot run inside the pure HTML
+    // builder below. Every print path goes through here instead: warm the
+    // diagram cache first, then build the document with the pictures in it.
+    static func preparedHTML(
+        source: String,
+        title: String,
+        theme: ReaderTheme,
+        baseURL: URL? = nil
+    ) async -> String {
+        await MermaidRenderer.shared.prepare(
+            sources: diagramSources(in: source),
+            style: diagramStyle(for: theme)
+        )
+        return html(source: source, title: title, theme: theme, baseURL: baseURL)
+    }
+
+    // Print is always on the light palette, whatever the reader is showing.
+    static func diagramStyle(for theme: ReaderTheme) -> MermaidStyle {
+        MermaidStyle(
+            theme: MarkdownTheme(readerTheme: theme, colorScheme: .light),
+            fontSize: 15
+        )
+    }
+
+    static func diagramSources(in source: String) -> [String] {
+        MarkdownParser.parse(source).compactMap { block -> String? in
+            guard case let .code(language, code) = block.kind,
+                  MermaidSupport.isMermaid(language: language) else { return nil }
+            return code
+        }
+    }
+
     static func html(source: String, title: String, theme: ReaderTheme, baseURL: URL? = nil) -> String {
         let palette = palette(for: theme)
         let body = MarkdownParser.parse(source)
@@ -128,6 +160,7 @@ enum MarkdownPrintRenderer {
         figure { margin: .75em 0; break-inside: avoid; } figcaption { color: \(palette.mutedText); font-size: .9em; text-align: center; }
         .front-matter { color: \(palette.quoteText); background: \(palette.frontMatterBg); border-radius: 6px; padding: .7em .9em; white-space: pre-wrap; break-inside: avoid; }
         img.math { display: block; margin: .9em auto; break-inside: avoid; }
+        img.diagram { display: block; margin: 1em auto; max-width: 100%; height: auto; break-inside: avoid; }
         img.inline-math { display: inline-block; margin: 0; }
         pre.math { text-align: center; }
         </style>
@@ -167,6 +200,12 @@ enum MarkdownPrintRenderer {
         case let .taskList(items):
             return list(items, tag: "ul", task: true, theme: theme, palette: palette)
         case let .code(language, source):
+            // A rendered diagram prints as the picture the reader shows; one
+            // that never rendered keeps printing as its fenced source.
+            if MermaidSupport.isMermaid(language: language),
+               let tag = diagramImageTag(source: source, theme: theme) {
+                return tag
+            }
             let className = language.map { " class=\"language-\(escapeAttribute($0))\"" } ?? ""
             return "<pre><code\(className)>\(escape(source))</code></pre>"
         case let .table(headers, rows):
@@ -283,6 +322,32 @@ enum MarkdownPrintRenderer {
         }
         let descent = points(formula.descent)
         return "<img class=\"inline-math\" style=\"width:\(width)pt;height:\(height)pt;vertical-align:-\(descent)pt\" alt=\"\(alt)\" src=\"\(source)\">"
+    }
+
+    private static func diagramImageTag(source: String, theme: ReaderTheme) -> String? {
+        guard let diagram = MermaidRenderer.shared.cachedDiagram(
+            source: source,
+            style: diagramStyle(for: theme)
+        ), let imageData = diagram.image.pngData() else {
+            return nil
+        }
+
+        // Only the width is pinned: the shared img rule keeps the height
+        // proportional when a wide diagram has to shrink to the text column.
+        let width = points(diagram.size.width)
+        let alt = escapeAttribute(diagramAlt(source))
+        return "<img class=\"diagram\" style=\"width:\(width)pt\" alt=\"\(alt)\" src=\"data:image/png;base64,\(imageData.base64EncodedString())\">"
+    }
+
+    // The first line of a mermaid block names the diagram ("sequenceDiagram",
+    // "graph TD"), which is the most useful thing to read out loud.
+    private static func diagramAlt(_ source: String) -> String {
+        let firstLine = source
+            .split(whereSeparator: \.isNewline)
+            .first { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+        return firstLine
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            ?? L10n.string("reader.mermaid.accessibility")
     }
 
     private static func points(_ value: CGFloat) -> String {

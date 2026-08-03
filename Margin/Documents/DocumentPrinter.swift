@@ -3,7 +3,21 @@ import UIKit
 
 @MainActor
 enum DocumentPrinter {
-    static func present(text: String, title: String, theme: ReaderTheme, baseURL: URL? = nil) {
+    // Diagrams have to be rendered before the markup is built, so presenting
+    // the print sheet waits on them the way PDF export does.
+    static func present(
+        text: String,
+        title: String,
+        theme: ReaderTheme,
+        baseURL: URL? = nil
+    ) async {
+        let markup = await MarkdownPrintRenderer.preparedHTML(
+            source: text,
+            title: title,
+            theme: theme,
+            baseURL: baseURL
+        )
+
         let controller = UIPrintInteractionController.shared
         let printInfo = UIPrintInfo(dictionary: nil)
         printInfo.jobName = title
@@ -11,14 +25,7 @@ enum DocumentPrinter {
         controller.printInfo = printInfo
         controller.showsNumberOfCopies = true
 
-        let formatter = UIMarkupTextPrintFormatter(
-            markupText: MarkdownPrintRenderer.html(
-                source: text,
-                title: title,
-                theme: theme,
-                baseURL: baseURL
-            )
-        )
+        let formatter = UIMarkupTextPrintFormatter(markupText: markup)
         controller.printFormatter = formatter
         controller.present(animated: true)
     }

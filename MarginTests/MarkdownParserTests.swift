@@ -841,6 +841,54 @@ struct MarkdownParserTests {
         #expect(exported.size.height == (30 + padding * 2) * renderScale)
     }
 
+    @Test func printCollectsMermaidSourcesAndRendersThemForTheLightPalette() {
+        let source = """
+        # Diagrams
+
+        ```mermaid
+        graph TD
+          A --> B
+        ```
+
+        ```swift
+        let value = 1
+        ```
+
+        ```mermaid theme=neutral
+        pie title Blocks
+          "Text" : 60
+        ```
+        """
+
+        // Print warms exactly the blocks it is going to draw as pictures.
+        #expect(
+            MarkdownPrintRenderer.diagramSources(in: source) == [
+                "graph TD\n  A --> B",
+                "pie title Blocks\n  \"Text\" : 60"
+            ]
+        )
+        // Print is always on the light palette, whatever the reader shows.
+        #expect(
+            MarkdownPrintRenderer.diagramStyle(for: .claude) == MermaidStyle(
+                theme: MarkdownTheme(readerTheme: .claude, colorScheme: .light),
+                fontSize: 15
+            )
+        )
+        #expect(
+            MarkdownPrintRenderer.diagramStyle(for: .github)
+                != MarkdownPrintRenderer.diagramStyle(for: .claude)
+        )
+
+        let html = MarkdownPrintRenderer.html(source: source, title: "Diagrams", theme: .claude)
+
+        #expect(html.contains("img.diagram"))
+        // Nothing was rendered in this test, so the diagrams keep printing as
+        // their source rather than leaving a hole in the page.
+        #expect(html.contains("<pre><code class=\"language-mermaid\">"))
+        #expect(html.contains("graph TD"))
+        #expect(!html.contains("<img class=\"diagram\""))
+    }
+
     @Test func bundlesTheMermaidRenderingResources() throws {
         let appBundle = try #require(Bundle(identifier: "com.fze.margin"))
 

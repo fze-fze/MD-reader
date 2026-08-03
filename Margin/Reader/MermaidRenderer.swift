@@ -92,6 +92,16 @@ final class MermaidRenderer {
         return try await task.value
     }
 
+    // Print and PDF build their HTML synchronously, so every diagram they need
+    // has to be in the cache before the renderer runs. Failures stay silent:
+    // a block without a picture prints as its source, which is the fallback
+    // the HTML already has.
+    func prepare(sources: [String], style: MermaidStyle) async {
+        for source in sources where cachedDiagram(source: source, style: style) == nil {
+            _ = try? await diagram(source: source, style: style)
+        }
+    }
+
     // Derived data, all of it rebuildable: hand it back when memory is tight,
     // web view included — mermaid.js alone is several megabytes of parsed script.
     func purge() {
