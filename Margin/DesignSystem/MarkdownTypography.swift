@@ -12,6 +12,9 @@ enum MarkdownTypography {
     @MainActor
     private static var inlineFontCache: [InlineFontCacheKey: InlineMarkdownFonts] = [:]
 
+    @MainActor
+    private static var inlineUIFontCache: [InlineFontCacheKey: InlineMarkdownUIFonts] = [:]
+
     static func documentFont(
         theme: ReaderTheme,
         size: Double,
@@ -72,6 +75,42 @@ enum MarkdownTypography {
         )
         inlineFontCache[cacheKey] = fonts
         return fonts
+    }
+
+    // UIFont twin of `inlineFonts`, for the UITextView-backed reader path.
+    // Same cascade and the same synthesized oblique — only the wrapper differs.
+    @MainActor
+    static func inlineUIFonts(
+        theme: ReaderTheme,
+        size: Double,
+        weight: UIFont.Weight = .regular
+    ) -> InlineMarkdownUIFonts {
+        let cacheKey = InlineFontCacheKey(
+            theme: theme,
+            size: size,
+            weight: weight.rawValue
+        )
+        if let cachedFonts = inlineUIFontCache[cacheKey] {
+            return cachedFonts
+        }
+
+        let strongWeight = weight.rawValue >= UIFont.Weight.bold.rawValue
+            ? weight
+            : .bold
+        let fonts = InlineMarkdownUIFonts(
+            regular: documentUIFont(theme: theme, size: size, weight: weight),
+            emphasized: inlineItalicUIFont(theme: theme, size: size, weight: weight),
+            strong: inlineStrongUIFont(theme: theme, size: size, weight: strongWeight),
+            strongEmphasis: inlineItalicUIFont(theme: theme, size: size, weight: strongWeight)
+        )
+        inlineUIFontCache[cacheKey] = fonts
+        return fonts
+    }
+
+    @MainActor
+    static func purgeFontCaches() {
+        inlineFontCache.removeAll()
+        inlineUIFontCache.removeAll()
     }
 
     static func inlineStrongUIFont(

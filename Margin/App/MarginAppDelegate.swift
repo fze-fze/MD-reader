@@ -9,6 +9,8 @@ final class MarginAppDelegate: NSObject, UIApplicationDelegate {
         MathRenderer.purgeCache()
         MermaidRenderer.shared.purge()
         InlineMarkdownStyler.purgeCache()
+        InlineMarkdownUIText.purgeCache()
         InlineMathSegmenter.purgeCache()
+        AnnotationSegmenter.purgeCache()
     }
 }
