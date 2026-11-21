@@ -2,6 +2,10 @@ import Foundation
 import Testing
 
 struct LocalizationTests {
+    @Test func showsAppLanguageSettingsWithoutSecondarySystemLanguage() {
+        #expect(Bundle.main.object(forInfoDictionaryKey: "UIPrefersShowingLanguageSettings") as? Bool == true)
+    }
+
     @Test(arguments: ["en", "zh-Hans", "zh-Hant", "ja", "ko", "es"])
     func includesCompleteStringTables(for language: String) throws {
         #expect(Bundle.main.localizations.contains(language))
