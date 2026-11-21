@@ -106,8 +106,11 @@ nonisolated struct LiveMarkdownLine {
         var previousWasLink = false
         for run in parsed.runs {
             guard let position = run.markdownSourcePosition,
-                  let range = NSRange(position, in: source),
-                  range.location >= end, NSMaxRange(range) <= original.length else { return }
+                  let sourceRange = Range<String.Index>(position, in: source) else { return }
+            // Foundation's direct NSRange conversion can truncate a run to
+            // one character; convert its Swift source range to UTF-16.
+            let range = NSRange(sourceRange, in: source)
+            guard range.location >= end, NSMaxRange(range) <= original.length else { return }
 
             let intent = run.inlinePresentationIntent ?? []
             let isLink = run.link != nil

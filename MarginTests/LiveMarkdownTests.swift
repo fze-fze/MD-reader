@@ -101,6 +101,22 @@ struct LiveMarkdownTests {
         #expect(view.text == "abc\n**code**\n```\n**body**")
     }
 
+    @Test @MainActor func insertedMarkdownFormatsAfterTheCaretMovesAway() async {
+        let (view, styler) = makeEditor("Today:\nNext line")
+        let markup = " **field notes**"
+        view.textStorage.replaceCharacters(in: NSRange(location: 6, length: 0), with: markup)
+        view.selectedRange = NSRange(location: 6 + markup.utf16.count, length: 0)
+        await refresh(styler)
+        #expect(!isHidden(in: view, at: 7))
+        #expect(!isHidden(in: view, at: 20))
+
+        view.selectedRange = NSRange(location: 6 + markup.utf16.count + 1, length: 0)
+        await refresh(styler)
+        #expect(isHidden(in: view, at: 7))
+        #expect(isHidden(in: view, at: 20))
+        #expect(view.text == "Today: **field notes**\nNext line")
+    }
+
     @MainActor private func makeEditor(_ text: String) -> (UITextView, LiveMarkdownStyler) {
         let view = UITextView(usingTextLayoutManager: false)
         view.text = text
