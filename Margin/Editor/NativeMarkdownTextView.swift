@@ -64,31 +64,10 @@ struct NativeMarkdownTextView: UIViewRepresentable {
 
     func updateUIView(_ view: UITextView, context: Context) {
         context.coordinator.parent = self
-        if context.coordinator.regionID != regionID {
-            context.coordinator.regionID = regionID
-            view.undoManager?.removeAllActions()
-        }
         if view.textContainerInset != textInsets {
             view.textContainerInset = textInsets
         }
-        let hasMarkedText = view.markedTextRange != nil
-        // This runs after every keystroke. `syncedText` is the string the
-        // text view itself just reported, so the usual comparison is between
-        // two references to the same storage; reading `view.text` here would
-        // copy the whole document each time.
-        if !hasMarkedText {
-            let coordinator = context.coordinator
-            coordinator.isSynchronizing = true
-            defer { coordinator.isSynchronizing = false }
-            if text != coordinator.syncedText {
-                replaceChangedRange(in: view, with: text)
-                coordinator.syncedText = text
-            }
-            if view.selectedRange != selectedRange, NSMaxRange(selectedRange) <= view.textStorage.length {
-                view.selectedRange = selectedRange
-                coordinator.styler.scheduleRefresh()
-            }
-        }
+        context.coordinator.synchronizeBackingText(in: view)
         if context.coordinator.lastTheme != theme {
             context.coordinator.lastTheme = theme
             view.backgroundColor = UIColor(theme.canvas)
@@ -150,16 +129,6 @@ struct NativeMarkdownTextView: UIViewRepresentable {
         .init(enabled: liveFormatting, theme: theme, bodySize: bodySize)
     }
 
-    // Assigning `UITextView.text` moves the caret to the end of the document
-    // and schedules an auto-scroll to it on the next layout pass, so a whole-
-    // text assignment jumps the viewport no matter what is restored afterwards.
-    // Replacing only the changed region in the text storage leaves the caret
-    // and scroll position alone.
-    private func replaceChangedRange(in view: UITextView, with newText: String) {
-        let change = Self.changedRange(from: view.text, to: newText)
-        view.textStorage.replaceCharacters(in: change.range, with: change.replacement)
-    }
-
     nonisolated static func changedRange(
         from oldText: String,
         to newText: String
@@ -200,10 +169,10 @@ struct NativeMarkdownTextView: UIViewRepresentable {
         let styler = LiveMarkdownStyler()
         var lastFindTrigger = 0
         var lastTheme: MarkdownTheme?
-        var regionID: UUID?
-        var isSynchronizing = false
+        private var regionID: UUID?
+        private var isSynchronizing = false
         // The text last exchanged with the binding, in either direction.
-        var syncedText: String
+        private var syncedText: String
         // Set when an edit could not be reported yet because an input method
         // was still composing.
         private var hasUnreportedEdit = false
@@ -213,6 +182,35 @@ struct NativeMarkdownTextView: UIViewRepresentable {
             syncedText = parent.text
             lastTheme = parent.theme
             regionID = parent.regionID
+        }
+
+        func synchronizeBackingText(in view: UITextView) {
+            guard view.markedTextRange == nil else { return }
+            isSynchronizing = true
+            defer { isSynchronizing = false }
+            let text = parent.text
+            if regionID != parent.regionID {
+                regionID = parent.regionID
+                view.undoManager?.removeAllActions()
+                // Canonically equivalent strings can have different UTF-16 offsets.
+                if !text.utf16.elementsEqual(syncedText.utf16) {
+                    view.textStorage.replaceCharacters(
+                        in: NSRange(location: 0, length: view.textStorage.length),
+                        with: text
+                    )
+                }
+                syncedText = text
+            } else if text != syncedText {
+                // Keep in-place updates incremental to avoid jumping the viewport.
+                let change = NativeMarkdownTextView.changedRange(from: view.text ?? "", to: text)
+                view.textStorage.replaceCharacters(in: change.range, with: change.replacement)
+                syncedText = text
+            }
+            let selection = parent.selectedRange
+            if view.selectedRange != selection, NSMaxRange(selection) <= view.textStorage.length {
+                view.selectedRange = selection
+                styler.scheduleRefresh()
+            }
         }
 
         func textViewDidChange(_ textView: UITextView) {

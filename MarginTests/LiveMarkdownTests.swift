@@ -13,6 +13,43 @@ struct LiveMarkdownTests {
         #expect(LiveMarkdownLine.canFormatDraft("- **Emphasis**\n- Math $a*b*c$"))
     }
 
+    @Test @MainActor func switchingEquivalentUnicodeRegionsLoadsExactTextBeforeSelection() {
+        let decomposed = "Cafe\u{0301}!"
+        let composed = "Caf\u{00E9}!"
+        #expect(decomposed == composed)
+        #expect(decomposed.utf16.count != composed.utf16.count)
+
+        func editor(for text: String) -> NativeMarkdownTextView {
+            NativeMarkdownTextView(
+                text: .constant(text),
+                selectedRange: .constant(NSRange(location: text.utf16.count, length: 0)),
+                isFocused: .constant(false),
+                findTrigger: 0,
+                liveFormatting: true,
+                theme: style(enabled: true).theme,
+                readerTheme: .github,
+                bodySize: 16,
+                embedded: true,
+                regionID: UUID()
+            )
+        }
+        let view = UITextView(usingTextLayoutManager: false)
+        view.text = decomposed
+        let coordinator = NativeMarkdownTextView.Coordinator(parent: editor(for: decomposed))
+        coordinator.parent = editor(for: composed)
+        coordinator.synchronizeBackingText(in: view)
+
+        #expect(view.text.utf16.elementsEqual(composed.utf16))
+        #expect(view.selectedRange == NSRange(location: composed.utf16.count, length: 0))
+        let inserted = (view.text as NSString).replacingCharacters(in: view.selectedRange, with: "?")
+        #expect(inserted.utf16.elementsEqual((composed + "?").utf16))
+
+        coordinator.parent = editor(for: decomposed)
+        coordinator.synchronizeBackingText(in: view)
+        #expect(view.text.utf16.elementsEqual(decomposed.utf16))
+        #expect(view.selectedRange == NSRange(location: decomposed.utf16.count, length: 0))
+    }
+
     @Test func headingAndInlineStylesUseOriginalUTF16Offsets() {
         let source = "## 你好🙂 **bold** and *斜体* ##"
         let line = LiveMarkdownLine(source: source)
