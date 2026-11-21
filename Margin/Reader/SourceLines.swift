@@ -3,11 +3,9 @@ import Foundation
 // Splits a document into lines while remembering each line's terminator, so a
 // rewritten document keeps whatever line endings it arrived with.
 //
-// Line numbering matches `MarkdownParser`, which splits with
-// `components(separatedBy: .newlines)` — that treats CR and LF as separate
-// separators, so "a\r\nb" is three lines, the middle one empty. Splitting by
-// unicode scalar reproduces that exactly; splitting by `Character` would not,
-// because Swift folds CRLF into a single grapheme.
+// Line numbering matches `MarkdownParser`: both split by `Character`, and
+// Swift folds CRLF into a single grapheme, so "a\r\nb" is two lines and the
+// first one remembers "\r\n" as its terminator.
 nonisolated enum SourceLines {
     struct Line: Equatable, Sendable {
         var text: String
@@ -16,17 +14,20 @@ nonisolated enum SourceLines {
 
     static func split(_ source: String) -> [Line] {
         var lines: [Line] = []
-        var current = ""
 
-        for scalar in source.unicodeScalars {
-            if CharacterSet.newlines.contains(scalar) {
-                lines.append(Line(text: current, terminator: String(scalar)))
-                current = ""
-            } else {
-                current.unicodeScalars.append(scalar)
+        var lineStart = source.startIndex
+        var index = source.startIndex
+
+        while index < source.endIndex {
+            let character = source[index]
+            let next = source.index(after: index)
+            if character.isNewline {
+                lines.append(Line(text: String(source[lineStart..<index]), terminator: String(character)))
+                lineStart = next
             }
+            index = next
         }
-        lines.append(Line(text: current, terminator: ""))
+        lines.append(Line(text: String(source[lineStart...]), terminator: ""))
         return lines
     }
 

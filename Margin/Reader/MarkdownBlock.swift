@@ -68,6 +68,18 @@ nonisolated struct MarkdownListItem: Identifiable, Equatable, Sendable {
     let id: Int
     let text: String
     let isChecked: Bool?
+    // Nesting depth, 0 for a top-level item.
+    let level: Int
+    // The number an ordered item is drawn with; nil for bullets and tasks.
+    let ordinal: Int?
+
+    init(id: Int, text: String, isChecked: Bool?, level: Int = 0, ordinal: Int? = nil) {
+        self.id = id
+        self.text = text
+        self.isChecked = isChecked
+        self.level = level
+        self.ordinal = ordinal
+    }
 }
 
 nonisolated struct MarkdownHeading: Identifiable, Equatable, Sendable {

@@ -437,11 +437,13 @@ struct MarkdownParserTests {
             return items.map(\.id)
         }
 
-        #expect(taskLines == [0, 2])
+        // CRLF ends one line, so the second task is line 1.
+        #expect(taskLines == [0, 1])
         #expect(MarkdownTaskToggler.toggledSource(source, taskAtLine: taskLines[0]) ==
             "- [x] First\r\n  * [X] Second\r\nParagraph")
         #expect(MarkdownTaskToggler.toggledSource(source, taskAtLine: taskLines[1]) ==
             "- [ ] First\r\n  * [ ] Second\r\nParagraph")
+        #expect(MarkdownTaskToggler.toggledSource(source, taskAtLine: 2) == source)
         #expect(MarkdownTaskToggler.toggledSource(source, taskAtLine: 4) == source)
     }
 

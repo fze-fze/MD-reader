@@ -27,17 +27,27 @@ nonisolated enum MarkdownTaskToggler {
     private static func contentRange(at targetLine: Int, in source: NSString) -> NSRange? {
         var currentLine = 0
         var lineStart = 0
+        var location = 0
 
-        for location in 0...source.length {
-            let isBoundary = location == source.length
-                || isNewline(source.character(at: location))
-
-            guard isBoundary else { continue }
+        while location <= source.length {
+            let isEnd = location == source.length
+            guard isEnd || isNewline(source.character(at: location)) else {
+                location += 1
+                continue
+            }
             if currentLine == targetLine {
                 return NSRange(location: lineStart, length: location - lineStart)
             }
+            // CRLF ends one line, as it does for the parser that numbered it.
+            if !isEnd,
+               source.character(at: location) == 0x000D,
+               location + 1 < source.length,
+               source.character(at: location + 1) == 0x000A {
+                location += 1
+            }
             currentLine += 1
-            lineStart = location + 1
+            location += 1
+            lineStart = location
         }
 
         return nil

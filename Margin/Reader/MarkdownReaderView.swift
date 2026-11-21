@@ -110,12 +110,8 @@ private struct MarkdownBlockView: View {
             .accessibilityElement(children: .contain)
         case let .blockquote(text):
             quote(text)
-        case let .unorderedList(items):
-            list(items, ordered: false)
-        case let .orderedList(items):
-            list(items, ordered: true)
-        case let .taskList(items):
-            taskList(items)
+        case let .unorderedList(items), let .orderedList(items), let .taskList(items):
+            list(items)
         case let .code(language, source):
             if MermaidSupport.isMermaid(language: language) {
                 MermaidBlockView(
@@ -199,90 +195,122 @@ private struct MarkdownBlockView: View {
         .accessibilityLabel(L10n.format("reader.quote_accessibility", text))
     }
 
-    private func list(_ items: [MarkdownListItem], ordered: Bool) -> some View {
+    // One view for every list kind: each item draws its own marker (number,
+    // bullet or checkbox) and is indented by its nesting level, so mixed and
+    // nested lists need no special casing.
+    private func list(_ items: [MarkdownListItem]) -> some View {
         let offsets = fragmentOccurrenceOffsets
         let itemFonts = inlineUIFonts(size: bodySize)
-        return VStack(alignment: .leading, spacing: 7) {
+        let hasTasks = items.contains { $0.isChecked != nil }
+        return VStack(alignment: .leading, spacing: hasTasks ? 4 : 7) {
             ForEach(items.enumerated(), id: \.element.id) { itemIndex, item in
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(ordered ? "\(itemIndex + 1)." : "•")
-                        .font(documentFont(size: bodySize))
-                        .foregroundStyle(theme.textSecondary)
-                        .frame(minWidth: 20, alignment: .trailing)
-                    SelectableInlineText(
-                        source: item.text,
-                        fonts: itemFonts,
-                        mathFontSize: bodySize,
-                        foregroundColor: UIColor(theme.textPrimary),
-                        theme: theme,
-                        searchText: searchText,
-                        activeOccurrenceIndex: activeOccurrenceIndex,
-                        occurrenceOffset: occurrenceOffset(offsets, itemIndex),
-                        lineSpacing: bodySize * 0.38
-                    )
+                Group {
+                    if let isChecked = item.isChecked {
+                        taskRow(
+                            item,
+                            isChecked: isChecked,
+                            fonts: itemFonts,
+                            occurrenceOffset: occurrenceOffset(offsets, itemIndex)
+                        )
+                    } else {
+                        bulletRow(
+                            item,
+                            fonts: itemFonts,
+                            occurrenceOffset: occurrenceOffset(offsets, itemIndex)
+                        )
+                        // Lines up with the text of neighbouring task rows.
+                        .padding(.leading, hasTasks ? 14 : 0)
+                    }
                 }
+                .padding(.leading, Double(item.level) * bodySize * 1.5)
             }
         }
-        .padding(.leading, 2)
+        .padding(.leading, hasTasks ? 0 : 2)
         .padding(.vertical, bodySize * 0.39)
     }
 
-    private func taskList(_ items: [MarkdownListItem]) -> some View {
-        let offsets = fragmentOccurrenceOffsets
-        let itemFonts = inlineUIFonts(size: bodySize)
-        return VStack(alignment: .leading, spacing: 4) {
-            ForEach(items.enumerated(), id: \.element.id) { itemIndex, item in
-                HStack(alignment: .center, spacing: 0) {
-                    Button {
-                        onToggleTask(item.id)
-                    } label: {
-                        Image(systemName: item.isChecked == true ? "checkmark.square.fill" : "square")
-                            .foregroundStyle(item.isChecked == true ? theme.accent : theme.textSecondary)
-                            .font(.system(size: bodySize * 0.95))
-                            .contentTransition(.symbolEffect(.replace))
-                            .animation(
-                                reduceMotion ? nil : .snappy(duration: 0.18),
-                                value: item.isChecked
-                            )
-                    }
-                    .buttonStyle(.plain)
-                    .frame(width: 44, height: 44)
-                    .contentShape(.rect)
-                    .accessibilityLabel(item.text)
-                    .accessibilityValue(
-                        L10n.string(
-                            item.isChecked == true
-                                ? "reader.task.completed"
-                                : "reader.task.incomplete"
-                        )
-                    )
-                    .accessibilityHint(
-                        L10n.string(
-                            item.isChecked == true
-                                ? "reader.task.mark_incomplete_hint"
-                                : "reader.task.mark_completed_hint"
-                        )
-                    )
-                    .sensoryFeedback(.selection, trigger: item.isChecked)
-
-                    SelectableInlineText(
-                        source: item.text,
-                        fonts: itemFonts,
-                        mathFontSize: bodySize,
-                        foregroundColor: UIColor(
-                            item.isChecked == true ? theme.textSecondary : theme.textPrimary
-                        ),
-                        theme: theme,
-                        searchText: searchText,
-                        activeOccurrenceIndex: activeOccurrenceIndex,
-                        occurrenceOffset: occurrenceOffset(offsets, itemIndex)
-                    )
-                    .accessibilityHidden(true)
-                }
-                .frame(minHeight: 44)
-            }
+    private func bulletRow(
+        _ item: MarkdownListItem,
+        fonts: InlineMarkdownUIFonts,
+        occurrenceOffset: Int
+    ) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(listMarker(for: item))
+                .font(documentFont(size: bodySize))
+                .monospacedDigit()
+                .foregroundStyle(theme.textSecondary)
+                .frame(minWidth: 20, alignment: .trailing)
+            SelectableInlineText(
+                source: item.text,
+                fonts: fonts,
+                mathFontSize: bodySize,
+                foregroundColor: UIColor(theme.textPrimary),
+                theme: theme,
+                searchText: searchText,
+                activeOccurrenceIndex: activeOccurrenceIndex,
+                occurrenceOffset: occurrenceOffset,
+                lineSpacing: bodySize * 0.38
+            )
         }
-        .padding(.vertical, bodySize * 0.39)
+    }
+
+    private func listMarker(for item: MarkdownListItem) -> String {
+        if let ordinal = item.ordinal { return "\(ordinal)." }
+        return switch item.level {
+        case 0: "•"
+        case 1: "◦"
+        default: "▪"
+        }
+    }
+
+    private func taskRow(
+        _ item: MarkdownListItem,
+        isChecked: Bool,
+        fonts: InlineMarkdownUIFonts,
+        occurrenceOffset: Int
+    ) -> some View {
+        HStack(alignment: .center, spacing: 0) {
+            Button {
+                onToggleTask(item.id)
+            } label: {
+                Image(systemName: isChecked ? "checkmark.square.fill" : "square")
+                    .foregroundStyle(isChecked ? theme.accent : theme.textSecondary)
+                    .font(.system(size: bodySize * 0.95))
+                    .contentTransition(.symbolEffect(.replace))
+                    .animation(
+                        reduceMotion ? nil : .snappy(duration: 0.18),
+                        value: isChecked
+                    )
+            }
+            .buttonStyle(.plain)
+            .frame(width: 44, height: 44)
+            .contentShape(.rect)
+            .accessibilityLabel(item.text)
+            .accessibilityValue(
+                L10n.string(isChecked ? "reader.task.completed" : "reader.task.incomplete")
+            )
+            .accessibilityHint(
+                L10n.string(
+                    isChecked
+                        ? "reader.task.mark_incomplete_hint"
+                        : "reader.task.mark_completed_hint"
+                )
+            )
+            .sensoryFeedback(.selection, trigger: isChecked)
+
+            SelectableInlineText(
+                source: item.text,
+                fonts: fonts,
+                mathFontSize: bodySize,
+                foregroundColor: UIColor(isChecked ? theme.textSecondary : theme.textPrimary),
+                theme: theme,
+                searchText: searchText,
+                activeOccurrenceIndex: activeOccurrenceIndex,
+                occurrenceOffset: occurrenceOffset
+            )
+            .accessibilityHidden(true)
+        }
+        .frame(minHeight: 44)
     }
 
     private func codeBlock(language: String?, source: String) -> some View {
