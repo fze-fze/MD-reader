@@ -155,7 +155,9 @@ struct LiveMarkdownEditorView: View {
                 )
                 .equatable()
             } else {
-                Color.clear.frame(height: row.id == document?.rows.last?.id ? 44 : 4)
+                // Blank separators already have margins on their surrounding
+                // Reader blocks. Keep only the end-of-document entry target.
+                Color.clear.frame(height: row.id == document?.rows.last?.id ? 44 : 0)
             }
         }
         .allowsHitTesting(false)
