@@ -4,11 +4,6 @@
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
-	<key>CFBundleLocalizations</key>
-	<array>
-		<string>en</string>
-		<string>zh-Hans</string>
-	</array>
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>
@@ -58,6 +53,8 @@
 	<key>UISupportsDocumentBrowser</key>
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<true/>
+	<key>UIPrefersShowingLanguageSettings</key>
 	<true/>
 	<key>UILaunchScreen</key>
 	<dict/>
