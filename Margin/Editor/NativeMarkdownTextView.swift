@@ -6,9 +6,20 @@ struct NativeMarkdownTextView: UIViewRepresentable {
     @Binding var selectedRange: NSRange
     @Binding var isFocused: Bool
     let findTrigger: Int
+    let liveFormatting: Bool
     let theme: MarkdownTheme
     let readerTheme: ReaderTheme
     let bodySize: Double
+    var embedded = false
+    var regionID: UUID? = nil
+    var isComposing: Binding<Bool>? = nil
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+    private var textInsets: UIEdgeInsets {
+        if embedded { return UIEdgeInsets(top: 4, left: 0, bottom: 4, right: 0) }
+        let padding = MarkdownTypography.columnPadding(compact: horizontalSizeClass == .compact)
+        return UIEdgeInsets(top: padding.top, left: padding.leading, bottom: 36, right: padding.trailing)
+    }
 
     func makeCoordinator() -> Coordinator {
         Coordinator(parent: self)
@@ -26,65 +37,43 @@ struct NativeMarkdownTextView: UIViewRepresentable {
         view.tintColor = UIColor(theme.accent)
         view.font = documentFont
         view.adjustsFontForContentSizeCategory = true
-        view.alwaysBounceVertical = true
+        view.isScrollEnabled = !embedded
+        view.alwaysBounceVertical = !embedded
         view.keyboardDismissMode = .interactive
-        view.textContainerInset = UIEdgeInsets(top: 24, left: 16, bottom: 36, right: 16)
-        view.textContainer.lineFragmentPadding = 4
+        view.textContainerInset = textInsets
+        view.textContainer.lineFragmentPadding = 0
         view.smartDashesType = .no
         view.smartQuotesType = .no
         view.smartInsertDeleteType = .no
-        view.isFindInteractionEnabled = true
+        view.isFindInteractionEnabled = !embedded
         view.accessibilityLabel = L10n.string("editor.accessibility_label")
         view.text = text
-        applyTypography(to: view)
         if selectedRange.location > 0, NSMaxRange(selectedRange) <= view.textStorage.length {
             view.selectedRange = selectedRange
-            scrollToSelection(in: view)
+            if !embedded { scrollToSelection(in: view) }
         }
-        context.coordinator.recordTypography(
-            readerTheme: readerTheme,
-            bodySize: bodySize,
-            textColor: UIColor(theme.textPrimary)
-        )
+        context.coordinator.styler.attach(to: view, style: editorStyle)
         return view
+    }
+
+    func sizeThatFits(_ proposal: ProposedViewSize, uiView: UITextView, context: Context) -> CGSize? {
+        guard embedded, let width = proposal.width, width.isFinite, width > 0 else { return nil }
+        let fitting = uiView.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude))
+        return CGSize(width: width, height: ceil(fitting.height))
     }
 
     func updateUIView(_ view: UITextView, context: Context) {
         context.coordinator.parent = self
-        let hasMarkedText = view.markedTextRange != nil
-        // This runs after every keystroke. `syncedText` is the string the
-        // text view itself just reported, so the usual comparison is between
-        // two references to the same storage; reading `view.text` here would
-        // copy the whole document each time.
-        if !hasMarkedText, text != context.coordinator.syncedText {
-            replaceChangedRange(in: view, with: text)
-            context.coordinator.syncedText = text
+        if view.textContainerInset != textInsets {
+            view.textContainerInset = textInsets
         }
-        if !hasMarkedText,
-           view.selectedRange != selectedRange,
-           NSMaxRange(selectedRange) <= view.textStorage.length {
-            view.selectedRange = selectedRange
-        }
+        context.coordinator.synchronizeBackingText(in: view)
         if context.coordinator.lastTheme != theme {
             context.coordinator.lastTheme = theme
             view.backgroundColor = UIColor(theme.canvas)
             view.tintColor = UIColor(theme.accent)
         }
-        let typographyChanged = context.coordinator.typographyChanged(
-            readerTheme: readerTheme,
-            bodySize: bodySize,
-            textColor: UIColor(theme.textPrimary)
-        )
-        if !hasMarkedText, typographyChanged {
-            view.textColor = UIColor(theme.textPrimary)
-            view.font = documentFont
-            applyTypography(to: view)
-            context.coordinator.recordTypography(
-                readerTheme: readerTheme,
-                bodySize: bodySize,
-                textColor: UIColor(theme.textPrimary)
-            )
-        }
+        context.coordinator.styler.updateStyle(editorStyle)
 
         if isFocused != view.isFirstResponder {
             Task { @MainActor in
@@ -136,21 +125,8 @@ struct NativeMarkdownTextView: UIViewRepresentable {
         MarkdownTypography.documentUIFont(theme: readerTheme, size: bodySize)
     }
 
-    // Assigning `UITextView.text` moves the caret to the end of the document
-    // and schedules an auto-scroll to it on the next layout pass, so a whole-
-    // text assignment jumps the viewport no matter what is restored afterwards.
-    // Replacing only the changed region in the text storage leaves the caret
-    // and scroll position alone.
-    private func replaceChangedRange(in view: UITextView, with newText: String) {
-        let change = Self.changedRange(from: view.text, to: newText)
-        view.textStorage.replaceCharacters(in: change.range, with: change.replacement)
-        applyTypography(
-            to: view,
-            range: NSRange(
-                location: change.range.location,
-                length: (change.replacement as NSString).length
-            )
-        )
+    private var editorStyle: LiveMarkdownStyler.Style {
+        .init(enabled: liveFormatting, theme: theme, bodySize: bodySize)
     }
 
     nonisolated static func changedRange(
@@ -187,49 +163,58 @@ struct NativeMarkdownTextView: UIViewRepresentable {
         return (range, replacement)
     }
 
-    private func applyTypography(to view: UITextView) {
-        applyTypography(
-            to: view,
-            range: NSRange(location: 0, length: view.textStorage.length)
-        )
-    }
-
-    private func applyTypography(to view: UITextView, range: NSRange) {
-        let paragraphStyle = NSMutableParagraphStyle()
-        paragraphStyle.lineHeightMultiple = 1.36
-
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: documentFont,
-            .foregroundColor: UIColor(theme.textPrimary),
-            .paragraphStyle: paragraphStyle
-        ]
-        view.typingAttributes = attributes
-
-        guard range.length > 0 else { return }
-        view.textStorage.addAttributes(attributes, range: range)
-    }
-
     @MainActor
     final class Coordinator: NSObject, UITextViewDelegate {
         var parent: NativeMarkdownTextView
+        let styler = LiveMarkdownStyler()
         var lastFindTrigger = 0
         var lastTheme: MarkdownTheme?
+        private var regionID: UUID?
+        private var isSynchronizing = false
         // The text last exchanged with the binding, in either direction.
-        var syncedText: String
+        private var syncedText: String
         // Set when an edit could not be reported yet because an input method
         // was still composing.
         private var hasUnreportedEdit = false
-        private var lastReaderTheme: ReaderTheme?
-        private var lastBodySize: Double?
-        private var lastTextColor: UIColor?
 
         init(parent: NativeMarkdownTextView) {
             self.parent = parent
             syncedText = parent.text
             lastTheme = parent.theme
+            regionID = parent.regionID
+        }
+
+        func synchronizeBackingText(in view: UITextView) {
+            guard view.markedTextRange == nil else { return }
+            isSynchronizing = true
+            defer { isSynchronizing = false }
+            let text = parent.text
+            if regionID != parent.regionID {
+                regionID = parent.regionID
+                view.undoManager?.removeAllActions()
+                // Canonically equivalent strings can have different UTF-16 offsets.
+                if !text.utf16.elementsEqual(syncedText.utf16) {
+                    view.textStorage.replaceCharacters(
+                        in: NSRange(location: 0, length: view.textStorage.length),
+                        with: text
+                    )
+                }
+                syncedText = text
+            } else if text != syncedText {
+                // Keep in-place updates incremental to avoid jumping the viewport.
+                let change = NativeMarkdownTextView.changedRange(from: view.text ?? "", to: text)
+                view.textStorage.replaceCharacters(in: change.range, with: change.replacement)
+                syncedText = text
+            }
+            let selection = parent.selectedRange
+            if view.selectedRange != selection, NSMaxRange(selection) <= view.textStorage.length {
+                view.selectedRange = selection
+                styler.scheduleRefresh()
+            }
         }
 
         func textViewDidChange(_ textView: UITextView) {
+            guard !isSynchronizing else { return }
             hasUnreportedEdit = true
             synchronizeCommittedText(from: textView)
         }
@@ -257,7 +242,11 @@ struct NativeMarkdownTextView: UIViewRepresentable {
         }
 
         func textViewDidChangeSelection(_ textView: UITextView) {
-            guard textView.markedTextRange == nil else { return }
+            guard !isSynchronizing else { return }
+            let composing = textView.markedTextRange != nil
+            updateComposition(composing)
+            guard !composing else { return }
+            styler.scheduleRefresh()
             if hasUnreportedEdit {
                 reportText(from: textView)
             }
@@ -275,30 +264,19 @@ struct NativeMarkdownTextView: UIViewRepresentable {
             parent.isFocused = false
         }
 
-        func typographyChanged(
-            readerTheme: ReaderTheme,
-            bodySize: Double,
-            textColor: UIColor
-        ) -> Bool {
-            lastReaderTheme != readerTheme
-                || lastBodySize != bodySize
-                || lastTextColor?.isEqual(textColor) != true
-        }
-
-        func recordTypography(
-            readerTheme: ReaderTheme,
-            bodySize: Double,
-            textColor: UIColor
-        ) {
-            lastReaderTheme = readerTheme
-            lastBodySize = bodySize
-            lastTextColor = textColor
-        }
-
         private func synchronizeCommittedText(from textView: UITextView) {
-            guard textView.markedTextRange == nil else { return }
+            let composing = textView.markedTextRange != nil
+            updateComposition(composing)
+            guard !composing else { return }
+            styler.scheduleRefresh()
             reportText(from: textView)
             parent.selectedRange = textView.selectedRange
+        }
+
+        private func updateComposition(_ composing: Bool) {
+            if let binding = parent.isComposing, binding.wrappedValue != composing {
+                binding.wrappedValue = composing
+            }
         }
 
         private func reportText(from textView: UITextView) {

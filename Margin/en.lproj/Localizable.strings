@@ -22,7 +22,9 @@
 "appearance.light" = "Light";
 "appearance.dark" = "Dark";
 "workspace.mode.read" = "Read";
-"workspace.mode.edit" = "Edit";
+"workspace.mode.label" = "Document mode";
+"workspace.mode.live" = "Live";
+"workspace.mode.source" = "Source";
 
 "settings.section.theme" = "Theme";
 "settings.document_theme" = "Document Theme";
@@ -98,6 +100,7 @@
 "editor.placeholder.code" = "code";
 "editor.placeholder.math" = "formula";
 "editor.accessibility_label" = "Markdown editor";
+"editor.live_formatting" = "Live Formatting";
 
 "outline.empty_title" = "No Outline";
 "outline.empty_description" = "Add Markdown headings and they will appear here.";

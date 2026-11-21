@@ -22,7 +22,9 @@
 "appearance.light" = "Claro";
 "appearance.dark" = "Oscuro";
 "workspace.mode.read" = "Leer";
-"workspace.mode.edit" = "Editar";
+"workspace.mode.label" = "Modo del documento";
+"workspace.mode.live" = "En vivo";
+"workspace.mode.source" = "Fuente";
 
 "settings.section.theme" = "Tema";
 "settings.document_theme" = "Tema del documento";
@@ -98,6 +100,7 @@
 "editor.placeholder.code" = "código";
 "editor.placeholder.math" = "fórmula";
 "editor.accessibility_label" = "Editor Markdown";
+"editor.live_formatting" = "Formato en tiempo real";
 
 "outline.empty_title" = "Sin esquema";
 "outline.empty_description" = "Añade encabezados Markdown para que aparezcan aquí.";
