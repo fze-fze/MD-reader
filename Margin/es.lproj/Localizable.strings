@@ -33,7 +33,7 @@
 "settings.reset_typography" = "Restablecer tipografía";
 "settings.title" = "Ajustes de lectura";
 "settings.app_language" = "Idioma de la app";
-"settings.app_language_hint" = "Elige el idioma de Margin en los ajustes de iOS.";
+"settings.app_language_hint" = "Cambia el idioma de Margin en Ajustes → Apps → Margin → Idioma.";
 
 "theme.picker.title" = "Elegir tema";
 "theme.picker.hint" = "Elige el tema de este documento";

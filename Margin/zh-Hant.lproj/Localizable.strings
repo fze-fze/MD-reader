@@ -33,7 +33,7 @@
 "settings.reset_typography" = "重設排版";
 "settings.title" = "閱讀設定";
 "settings.app_language" = "App 語言";
-"settings.app_language_hint" = "在 iOS 設定中選擇 Margin 的語言。";
+"settings.app_language_hint" = "前往「設定 → App → Margin → 語言」更改介面語言。";
 
 "theme.picker.title" = "選擇主題";
 "theme.picker.hint" = "選擇此文件的主題";

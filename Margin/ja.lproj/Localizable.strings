@@ -33,7 +33,7 @@
 "settings.reset_typography" = "文字組みをリセット";
 "settings.title" = "閲覧設定";
 "settings.app_language" = "アプリの言語";
-"settings.app_language_hint" = "iOSの設定でMarginの表示言語を選べます。";
+"settings.app_language_hint" = "「設定」→「アプリ」→「Margin」→「言語」で表示言語を変更できます。";
 
 "theme.picker.title" = "テーマを選択";
 "theme.picker.hint" = "この書類のテーマを選択";

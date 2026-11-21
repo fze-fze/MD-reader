@@ -99,7 +99,7 @@ Persistence is three `@AppStorage` keys, declared in `DocumentWorkspaceView`: `r
 
 ### Localization
 
-`en` is the Xcode **development language**. The app ships `en`, `zh-Hans`, `zh-Hant`, `ja`, `ko`, and `es`. iOS selects the best match for the user's preferred languages or per-app language setting. The App Language link in Reading Settings opens the native app settings page; `UIPrefersShowingLanguageSettings` makes the setting visible even with one system language. Do not override `AppleLanguages` or mutate the bundle at runtime.
+`en` is the Xcode **development language**. The app ships `en`, `zh-Hans`, `zh-Hant`, `ja`, `ko`, and `es`. iOS selects the best match for the user's preferred languages or per-app language setting. The App Language button in Reading Settings opens iOS Settings; `UIPrefersShowingLanguageSettings` makes the per-app language setting visible even with one system language. Do not override `AppleLanguages` or mutate the bundle at runtime.
 
 - SwiftUI: pass semantic keys as `LocalizedStringKey` literals (`Button("workspace.search", …)`).
 - UIKit / plain `String`: `L10n.string("key")` / `L10n.format("key", args…)`.

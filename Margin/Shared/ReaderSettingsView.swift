@@ -68,7 +68,9 @@ struct ReaderSettingsView: View {
 
                 if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
                     Section {
-                        Link(destination: settingsURL) {
+                        Button {
+                            UIApplication.shared.open(settingsURL)
+                        } label: {
                             Label("settings.app_language", systemImage: "globe")
                         }
                     } footer: {
