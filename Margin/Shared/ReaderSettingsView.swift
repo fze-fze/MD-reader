@@ -5,6 +5,8 @@ struct ReaderSettingsView: View {
     @Binding private var appearance: ReaderAppearance
     @Binding private var textScale: Double
     @Binding private var readerTheme: ReaderTheme
+    @Binding private var bodyFont: ReaderFontChoice
+    @Binding private var headingFont: ReaderFontChoice
     @State private var draftTextScale: Double
 
     @Environment(\.dismiss) private var dismiss
@@ -13,11 +15,15 @@ struct ReaderSettingsView: View {
     init(
         appearance: Binding<ReaderAppearance>,
         textScale: Binding<Double>,
-        readerTheme: Binding<ReaderTheme>
+        readerTheme: Binding<ReaderTheme>,
+        bodyFont: Binding<ReaderFontChoice>,
+        headingFont: Binding<ReaderFontChoice>
     ) {
         _appearance = appearance
         _textScale = textScale
         _readerTheme = readerTheme
+        _bodyFont = bodyFont
+        _headingFont = headingFont
         _draftTextScale = State(initialValue: textScale.wrappedValue)
     }
 
@@ -41,9 +47,23 @@ struct ReaderSettingsView: View {
                         }
                     }
                     .pickerStyle(.segmented)
+                    // A segmented control already draws its own track; inside
+                    // a row card it reads as a box within a box.
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
                 }
 
                 Section("settings.section.typography") {
+                    Picker("settings.body_font", selection: $bodyFont) {
+                        ForEach(ReaderFontChoice.allCases) { choice in
+                            Text(choice.title).tag(choice)
+                        }
+                    }
+                    Picker("settings.heading_font", selection: $headingFont) {
+                        ForEach(ReaderFontChoice.allCases) { choice in
+                            Text(choice.title).tag(choice)
+                        }
+                    }
                     LabeledContent("settings.body_size") {
                         HStack {
                             Image(systemName: "textformat.size.smaller")
@@ -62,8 +82,14 @@ struct ReaderSettingsView: View {
                     Button("settings.reset_typography") {
                         draftTextScale = 1
                         commitTextScale()
+                        bodyFont = .themeDefault
+                        headingFont = .themeDefault
                     }
-                    .disabled(draftTextScale == 1)
+                    .disabled(
+                        draftTextScale == 1
+                            && bodyFont == .themeDefault
+                            && headingFont == .themeDefault
+                    )
                 }
 
                 if let settingsURL = URL(string: UIApplication.openSettingsURLString) {

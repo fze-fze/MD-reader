@@ -32,6 +32,11 @@
 "settings.display_mode" = "화면 모드";
 "settings.section.typography" = "타이포그래피";
 "settings.body_size" = "본문 크기";
+"settings.body_font" = "본문 서체";
+"settings.heading_font" = "제목 서체";
+"font.theme_default" = "테마 기본값";
+"font.serif" = "세리프";
+"font.sans" = "산세리프";
 "settings.reset_typography" = "타이포그래피 재설정";
 "settings.title" = "읽기 설정";
 "settings.app_language" = "앱 언어";

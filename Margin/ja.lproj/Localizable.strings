@@ -32,6 +32,11 @@
 "settings.display_mode" = "表示モード";
 "settings.section.typography" = "文字組み";
 "settings.body_size" = "本文の文字サイズ";
+"settings.body_font" = "本文フォント";
+"settings.heading_font" = "見出しフォント";
+"font.theme_default" = "テーマに合わせる";
+"font.serif" = "セリフ";
+"font.sans" = "サンセリフ";
 "settings.reset_typography" = "文字組みをリセット";
 "settings.title" = "閲覧設定";
 "settings.app_language" = "アプリの言語";

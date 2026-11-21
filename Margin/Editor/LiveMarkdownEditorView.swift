@@ -28,6 +28,8 @@ struct LiveMarkdownEditorView: View {
     let textScale: Double
     let baseURL: URL?
     let readerTheme: ReaderTheme
+    var bodyFont = ReaderFontChoice.themeDefault
+    var headingFont = ReaderFontChoice.themeDefault
     let isCurrentEditor: () -> Bool
 
     @Environment(\.colorScheme) private var colorScheme
@@ -42,7 +44,12 @@ struct LiveMarkdownEditorView: View {
     @State private var accessoryRequest: MarkdownEditorView.AccessoryRequest?
 
     private var theme: MarkdownTheme {
-        MarkdownTheme(readerTheme: readerTheme, colorScheme: colorScheme)
+        MarkdownTheme(
+            readerTheme: readerTheme,
+            colorScheme: colorScheme,
+            bodyFont: bodyFont,
+            headingFont: headingFont
+        )
     }
 
     var body: some View {
@@ -127,6 +134,8 @@ struct LiveMarkdownEditorView: View {
             findTrigger: 0,
             liveFormatting: true,
             readerTheme: readerTheme,
+            bodyFont: bodyFont,
+            headingFont: headingFont,
             embedded: true,
             sourceOffset: region.range.location,
             accessoryRequest: accessoryRequest,

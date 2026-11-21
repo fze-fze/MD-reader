@@ -95,7 +95,9 @@ Speed: the index is built lazily when search opens, `InlinePlainText.strippedMar
 
 `MarkdownTypography` builds the Claude serif stack: bundled `AnthropicSerifWebText` for Latin with a `.cascadeList` fallback to bundled `NotoSerifSC` (then system Songti) for CJK. Fonts are registered via `UIAppFonts` in `Info.plist`.
 
-Persistence is three `@AppStorage` keys, declared in `DocumentWorkspaceView`: `readerAppearance`, `readerTextScale`, `readerTheme`.
+Body and heading faces are user-selectable (`ReaderFontChoice`: theme default / serif / sans, carried on `MarkdownTheme`). A choice resolves per theme to a `DocumentTypeface`, which is what every `MarkdownTypography` call takes: Claude pairs Anthropic Serif with the bundled variable `AnthropicSansWebText` (weight and optical size are set as variation axes, CJK cascades to the system sans), GitHub pairs New York with San Francisco. The editor follows the body choice. Export and print follow the choice too but name system fonts only — the bundled faces are not embedded.
+
+Persistence is five `@AppStorage` keys, declared in `DocumentWorkspaceView`: `readerAppearance`, `readerTextScale`, `readerTheme`, `readerBodyFont`, `readerHeadingFont`.
 
 ### Localization
 

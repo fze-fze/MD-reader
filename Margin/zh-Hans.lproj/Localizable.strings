@@ -32,6 +32,11 @@
 "settings.display_mode" = "显示模式";
 "settings.section.typography" = "排版";
 "settings.body_size" = "正文大小";
+"settings.body_font" = "正文字体";
+"settings.heading_font" = "标题字体";
+"font.theme_default" = "跟随主题";
+"font.serif" = "衬线";
+"font.sans" = "无衬线";
 "settings.reset_typography" = "恢复默认排版";
 "settings.title" = "阅读设置";
 "settings.app_language" = "App 语言";

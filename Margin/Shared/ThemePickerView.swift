@@ -73,7 +73,11 @@ private struct ThemePreviewCard: View {
     private var preview: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("theme.preview")
-                .font(MarkdownTypography.documentFont(theme: theme, size: 14, weight: .semibold))
+                .font(MarkdownTypography.documentFont(
+                    typeface: ReaderFontChoice.themeDefault.typeface(for: theme),
+                    size: 14,
+                    weight: .semibold
+                ))
                 .foregroundStyle(palette.textStrong)
             RoundedRectangle(cornerRadius: 2)
                 .fill(palette.accent)

@@ -201,14 +201,16 @@ final class LiveMarkdownStyler: NSObject, NSTextStorageDelegate, NSLayoutManager
         let style = palette.style
         var weight: UIFont.Weight = .regular
         var size = style.bodySize
+        var typeface = style.theme.bodyTypeface
         switch model.block {
         case .body:
             break
         case let .heading(level):
             weight = .bold
             size *= style.theme.headingScale(level: level)
+            typeface = style.theme.headingTypeface
             storage.addAttributes([
-                .font: MarkdownTypography.inlineUIFonts(theme: style.theme.readerTheme, size: size, weight: weight).strong,
+                .font: MarkdownTypography.inlineUIFonts(typeface: typeface, size: size, weight: weight).strong,
                 .foregroundColor: UIColor(style.theme.textStrong)
             ], range: content)
         case .quote:
@@ -238,7 +240,7 @@ final class LiveMarkdownStyler: NSObject, NSTextStorageDelegate, NSLayoutManager
                     .backgroundColor: UIColor(style.theme.inlineCodeFill)
                 ], range: range)
             } else if run.intent.contains(.emphasized) || run.intent.contains(.stronglyEmphasized) {
-                let fonts = MarkdownTypography.inlineUIFonts(theme: style.theme.readerTheme, size: size, weight: weight)
+                let fonts = MarkdownTypography.inlineUIFonts(typeface: typeface, size: size, weight: weight)
                 let strong = run.intent.contains(.stronglyEmphasized) || weight == .bold
                 let font = run.intent.contains(.emphasized)
                     ? (strong ? fonts.strongEmphasis : fonts.emphasized)
@@ -340,7 +342,7 @@ final class LiveMarkdownStyler: NSObject, NSTextStorageDelegate, NSLayoutManager
             let paragraph = NSMutableParagraphStyle()
             paragraph.lineHeightMultiple = 1.36
             base = [
-                .font: MarkdownTypography.documentUIFont(theme: style.theme.readerTheme, size: style.bodySize),
+                .font: MarkdownTypography.documentUIFont(typeface: style.theme.bodyTypeface, size: style.bodySize),
                 .foregroundColor: UIColor(style.theme.textPrimary),
                 .paragraphStyle: paragraph
             ]

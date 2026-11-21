@@ -7,6 +7,8 @@ struct DocumentWorkspaceView: View {
     @AppStorage("readerAppearance") private var appearance = ReaderAppearance.system
     @AppStorage("readerTextScale") private var textScale = 1.0
     @AppStorage("readerTheme") private var readerTheme = ReaderTheme.claude
+    @AppStorage("readerBodyFont") private var bodyFont = ReaderFontChoice.themeDefault
+    @AppStorage("readerHeadingFont") private var headingFont = ReaderFontChoice.themeDefault
     @State private var mode: WorkspaceMode = .read
     @State private var readerSource: String
     @State private var presentedSheet: WorkspaceSheet?
@@ -64,6 +66,8 @@ struct DocumentWorkspaceView: View {
                 textScale: textScale,
                 baseURL: effectiveFileURL?.deletingLastPathComponent(),
                 readerTheme: readerTheme,
+                bodyFont: bodyFont,
+                headingFont: headingFont,
                 position: readingPosition,
                 positionRestoreRevision: positionRestoreRevision,
                 onToggleTask: toggleTask
@@ -81,6 +85,8 @@ struct DocumentWorkspaceView: View {
                     textScale: textScale,
                     baseURL: effectiveFileURL?.deletingLastPathComponent(),
                     readerTheme: readerTheme,
+                    bodyFont: bodyFont,
+                    headingFont: headingFont,
                     isCurrentEditor: { mode == .live }
                 )
                 .transition(.opacity)
@@ -94,6 +100,7 @@ struct DocumentWorkspaceView: View {
                     findTrigger: editorFindTrigger,
                     liveFormatting: false,
                     readerTheme: readerTheme,
+                    bodyFont: bodyFont,
                     isCurrentEditor: { mode == .source }
                 )
                     .transition(.opacity)
@@ -272,7 +279,9 @@ struct DocumentWorkspaceView: View {
             ReaderSettingsView(
                 appearance: $appearance,
                 textScale: $textScale,
-                readerTheme: $readerTheme
+                readerTheme: $readerTheme,
+                bodyFont: $bodyFont,
+                headingFont: $headingFont
             )
         case .info:
             DocumentInfoView(

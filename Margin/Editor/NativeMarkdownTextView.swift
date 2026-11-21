@@ -122,7 +122,7 @@ struct NativeMarkdownTextView: UIViewRepresentable {
     }
 
     private var documentFont: UIFont {
-        MarkdownTypography.documentUIFont(theme: readerTheme, size: bodySize)
+        MarkdownTypography.documentUIFont(typeface: theme.bodyTypeface, size: bodySize)
     }
 
     private var editorStyle: LiveMarkdownStyler.Style {

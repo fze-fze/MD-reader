@@ -7,6 +7,8 @@ struct MarkdownReaderView: View {
     let textScale: Double
     let baseURL: URL?
     let readerTheme: ReaderTheme
+    var bodyFont = ReaderFontChoice.themeDefault
+    var headingFont = ReaderFontChoice.themeDefault
     let position: ReadingPosition
     let positionRestoreRevision: Int
     let onToggleTask: (Int) -> Void
@@ -20,8 +22,14 @@ struct MarkdownReaderView: View {
     @State private var parsedSource: String?
 
     private var theme: MarkdownTheme {
-        MarkdownTheme(readerTheme: readerTheme, colorScheme: colorScheme)
+        MarkdownTheme(
+            readerTheme: readerTheme,
+            colorScheme: colorScheme,
+            bodyFont: bodyFont,
+            headingFont: headingFont
+        )
     }
+
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
@@ -228,7 +236,11 @@ struct MarkdownBlockView: View, Equatable {
         let multiplier = theme.headingScale(level: level)
         return SelectableInlineText(
             source: text,
-            fonts: inlineUIFonts(size: bodySize * multiplier, weight: .semibold),
+            fonts: MarkdownTypography.inlineUIFonts(
+                typeface: theme.headingTypeface,
+                size: bodySize * multiplier,
+                weight: .semibold
+            ),
             mathFontSize: bodySize * multiplier,
             foregroundColor: UIColor(level == 6 ? theme.textSecondary : theme.textStrong),
             theme: theme,
@@ -613,7 +625,7 @@ struct MarkdownBlockView: View, Equatable {
         weight: UIFont.Weight = .regular
     ) -> Font {
         MarkdownTypography.documentFont(
-            theme: theme.readerTheme,
+            typeface: theme.bodyTypeface,
             size: size,
             weight: weight
         )
@@ -624,7 +636,7 @@ struct MarkdownBlockView: View, Equatable {
         weight: UIFont.Weight = .regular
     ) -> InlineMarkdownFonts {
         MarkdownTypography.inlineFonts(
-            theme: theme.readerTheme,
+            typeface: theme.bodyTypeface,
             size: size,
             weight: weight
         )
@@ -635,7 +647,7 @@ struct MarkdownBlockView: View, Equatable {
         weight: UIFont.Weight = .regular
     ) -> InlineMarkdownUIFonts {
         MarkdownTypography.inlineUIFonts(
-            theme: theme.readerTheme,
+            typeface: theme.bodyTypeface,
             size: size,
             weight: weight
         )

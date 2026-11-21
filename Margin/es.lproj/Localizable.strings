@@ -32,6 +32,11 @@
 "settings.display_mode" = "Modo de visualización";
 "settings.section.typography" = "Tipografía";
 "settings.body_size" = "Tamaño del texto";
+"settings.body_font" = "Fuente del texto";
+"settings.heading_font" = "Fuente de los títulos";
+"font.theme_default" = "Según el tema";
+"font.serif" = "Con serifa";
+"font.sans" = "Sin serifa";
 "settings.reset_typography" = "Restablecer tipografía";
 "settings.title" = "Ajustes de lectura";
 "settings.app_language" = "Idioma de la app";

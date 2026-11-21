@@ -9,7 +9,7 @@ enum MarkdownTypography {
     }
 
     private struct InlineFontCacheKey: Hashable {
-        let theme: ReaderTheme
+        let typeface: DocumentTypeface
         let size: Double
         let weight: Double
     }
@@ -21,35 +21,39 @@ enum MarkdownTypography {
     private static var inlineUIFontCache: [InlineFontCacheKey: InlineMarkdownUIFonts] = [:]
 
     static func documentFont(
-        theme: ReaderTheme,
+        typeface: DocumentTypeface,
         size: Double,
         weight: UIFont.Weight = .regular
     ) -> Font {
-        Font(documentUIFont(theme: theme, size: size, weight: weight))
+        Font(documentUIFont(typeface: typeface, size: size, weight: weight))
     }
 
     static func documentUIFont(
-        theme: ReaderTheme,
+        typeface: DocumentTypeface,
         size: Double,
         weight: UIFont.Weight = .regular
     ) -> UIFont {
         let pointSize = CGFloat(size)
-        switch theme {
-        case .claude:
+        switch typeface {
+        case .anthropicSerif:
             return claudeFont(size: pointSize, weight: weight)
-        case .github:
+        case .anthropicSans:
+            return UIFont(descriptor: anthropicSansDescriptor(size: pointSize, weight: weight), size: pointSize)
+        case .systemSerif:
+            return UIFont(descriptor: systemSerifDescriptor(size: pointSize, weight: weight), size: pointSize)
+        case .systemSans:
             return UIFont.systemFont(ofSize: pointSize, weight: weight)
         }
     }
 
     @MainActor
     static func inlineFonts(
-        theme: ReaderTheme,
+        typeface: DocumentTypeface,
         size: Double,
         weight: UIFont.Weight = .regular
     ) -> InlineMarkdownFonts {
         let cacheKey = InlineFontCacheKey(
-            theme: theme,
+            typeface: typeface,
             size: size,
             weight: weight.rawValue
         )
@@ -61,19 +65,19 @@ enum MarkdownTypography {
             ? weight
             : .bold
         let fonts = InlineMarkdownFonts(
-            regular: documentFont(theme: theme, size: size, weight: weight),
+            regular: documentFont(typeface: typeface, size: size, weight: weight),
             emphasized: Font(inlineItalicUIFont(
-                theme: theme,
+                typeface: typeface,
                 size: size,
                 weight: weight
             )),
             strong: Font(inlineStrongUIFont(
-                theme: theme,
+                typeface: typeface,
                 size: size,
                 weight: strongWeight
             )),
             strongEmphasis: Font(inlineItalicUIFont(
-                theme: theme,
+                typeface: typeface,
                 size: size,
                 weight: strongWeight
             ))
@@ -86,12 +90,12 @@ enum MarkdownTypography {
     // Same cascade and the same synthesized oblique — only the wrapper differs.
     @MainActor
     static func inlineUIFonts(
-        theme: ReaderTheme,
+        typeface: DocumentTypeface,
         size: Double,
         weight: UIFont.Weight = .regular
     ) -> InlineMarkdownUIFonts {
         let cacheKey = InlineFontCacheKey(
-            theme: theme,
+            typeface: typeface,
             size: size,
             weight: weight.rawValue
         )
@@ -103,10 +107,10 @@ enum MarkdownTypography {
             ? weight
             : .bold
         let fonts = InlineMarkdownUIFonts(
-            regular: documentUIFont(theme: theme, size: size, weight: weight),
-            emphasized: inlineItalicUIFont(theme: theme, size: size, weight: weight),
-            strong: inlineStrongUIFont(theme: theme, size: size, weight: strongWeight),
-            strongEmphasis: inlineItalicUIFont(theme: theme, size: size, weight: strongWeight)
+            regular: documentUIFont(typeface: typeface, size: size, weight: weight),
+            emphasized: inlineItalicUIFont(typeface: typeface, size: size, weight: weight),
+            strong: inlineStrongUIFont(typeface: typeface, size: size, weight: strongWeight),
+            strongEmphasis: inlineItalicUIFont(typeface: typeface, size: size, weight: strongWeight)
         )
         inlineUIFontCache[cacheKey] = fonts
         return fonts
@@ -119,33 +123,38 @@ enum MarkdownTypography {
     }
 
     static func inlineStrongUIFont(
-        theme: ReaderTheme,
+        typeface: DocumentTypeface,
         size: Double,
         weight: UIFont.Weight
     ) -> UIFont {
         let pointSize = CGFloat(size)
-        let systemFont = UIFont.systemFont(ofSize: pointSize, weight: weight)
-        var descriptor = systemFont.fontDescriptor
-        if theme == .claude {
-            descriptor = descriptor.withDesign(.serif) ?? descriptor
-            descriptor = descriptor.addingAttributes([
-                .cascadeList: [cjkSerifDescriptor(size: pointSize, weight: weight)]
-            ])
+        switch typeface {
+        case .anthropicSerif, .systemSerif:
+            // The bundled Anthropic Serif is a single regular weight, so its
+            // bold comes from New York.
+            return UIFont(descriptor: systemSerifDescriptor(size: pointSize, weight: weight), size: pointSize)
+        case .anthropicSans:
+            return UIFont(descriptor: anthropicSansDescriptor(size: pointSize, weight: weight), size: pointSize)
+        case .systemSans:
+            return UIFont.systemFont(ofSize: pointSize, weight: weight)
         }
-        return UIFont(descriptor: descriptor, size: pointSize)
     }
 
     static func inlineItalicUIFont(
-        theme: ReaderTheme,
+        typeface: DocumentTypeface,
         size: Double,
         weight: UIFont.Weight
     ) -> UIFont {
         let pointSize = CGFloat(size)
         let descriptor: UIFontDescriptor
-        switch theme {
-        case .claude:
+        switch typeface {
+        case .anthropicSerif:
             descriptor = claudeDescriptor(size: pointSize, weight: weight)
-        case .github:
+        case .anthropicSans:
+            descriptor = anthropicSansDescriptor(size: pointSize, weight: weight)
+        case .systemSerif:
+            descriptor = systemSerifDescriptor(size: pointSize, weight: weight)
+        case .systemSans:
             descriptor = UIFont.systemFont(ofSize: pointSize, weight: weight)
                 .fontDescriptor
                 .addingAttributes([
@@ -191,6 +200,54 @@ enum MarkdownTypography {
             .traits: [UIFontDescriptor.TraitKey.weight: weight.rawValue],
             .cascadeList: [cjkSerifDescriptor(size: size, weight: weight)]
         ])
+    }
+
+    private static func systemSerifDescriptor(
+        size: CGFloat,
+        weight: UIFont.Weight
+    ) -> UIFontDescriptor {
+        let system = UIFont.systemFont(ofSize: size, weight: weight).fontDescriptor
+        return (system.withDesign(.serif) ?? system).addingAttributes([
+            .cascadeList: [cjkSerifDescriptor(size: size, weight: weight)]
+        ])
+    }
+
+    static let anthropicSansPostScriptName = "AnthropicSansWebWeb-TextRegular"
+
+    // Anthropic Sans is one variable file: weight and optical size are axes,
+    // not separate faces, so they are set as variations. CJK has to be named
+    // in the cascade too — left to the default fallback it comes out regular
+    // weight under a semibold heading.
+    private static func anthropicSansDescriptor(
+        size: CGFloat,
+        weight: UIFont.Weight
+    ) -> UIFontDescriptor {
+        let system = UIFont.systemFont(ofSize: size, weight: weight).fontDescriptor
+        guard let base = UIFont(name: anthropicSansPostScriptName, size: size)?.fontDescriptor else {
+            return system
+        }
+        let variation = UIFontDescriptor.AttributeName(rawValue: kCTFontVariationAttribute as String)
+        return base.addingAttributes([
+            variation: [
+                fourCharCode("wght"): anthropicSansWeight(for: weight),
+                fourCharCode("opsz"): Double(min(max(size, 16), 48))
+            ],
+            .cascadeList: [system]
+        ])
+    }
+
+    // UIFont.Weight is -1...1; the font's axis runs 300 (light) to 800.
+    static func anthropicSansWeight(for weight: UIFont.Weight) -> Double {
+        let stops: [(UIFont.Weight, Double)] = [
+            (.light, 300), (.regular, 400), (.medium, 500),
+            (.semibold, 600), (.bold, 700), (.heavy, 800)
+        ]
+        let nearest = stops.min { abs($0.0.rawValue - weight.rawValue) < abs($1.0.rawValue - weight.rawValue) }
+        return nearest?.1 ?? 400
+    }
+
+    private static func fourCharCode(_ tag: String) -> Int {
+        tag.utf8.reduce(0) { ($0 << 8) | Int($1) }
     }
 
     private static func cjkSerifDescriptor(

@@ -10,6 +10,7 @@ Margin 是一个面向 iPhone 和 iPad 的原生 Markdown 阅读与编辑器。�
 - 系统级自动保存、文件协调、最近项目和文档分享
 - 可在首页选取 Claude 或 Typora GitHub 文稿主题，并在阅读设置中随时切换
 - Claude 主题使用 Anthropic Serif 拉丁字体与 Noto Serif SC 中文衬线回退，支持明暗配色
+- 正文与标题可分别选择衬线或无衬线字体（Claude 主题的无衬线为 Anthropic Sans）
 - 标题、段落、引用、列表、任务、代码块、表格、图片、分隔线与 front matter 渲染
 - ` ```mermaid ` 代码块在阅读视图中渲染为图表，右上角的复制按钮相应变为“导出图片”，可分享带主题背景的 PNG；打印、PDF 与 HTML 导出同样内嵌渲染后的图表
 - 文档顶部可直接切换阅读、实时排版和源码模式。实时排版复用阅读模式的渲染，包括表格、公式和图片；点按任一块即可用原生 TextKit 编辑其 Markdown 源码。源码模式可跨块编辑和查找全文。

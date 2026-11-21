@@ -13,12 +13,16 @@ enum DocumentPDFExporter {
         text: String,
         title: String,
         theme: ReaderTheme,
+        bodyFont: ReaderFontChoice = .themeDefault,
+        headingFont: ReaderFontChoice = .themeDefault,
         baseURL: URL?
     ) async throws {
         let data = try await pdfData(
             text: text,
             title: title,
             theme: theme,
+            bodyFont: bodyFont,
+            headingFont: headingFont,
             baseURL: baseURL
         )
         let fileURL = try DocumentSharePresenter.makeTemporaryFile(
@@ -33,12 +37,16 @@ enum DocumentPDFExporter {
         text: String,
         title: String,
         theme: ReaderTheme,
+        bodyFont: ReaderFontChoice = .themeDefault,
+        headingFont: ReaderFontChoice = .themeDefault,
         baseURL: URL?
     ) async throws -> Data {
         let html = await MarkdownPrintRenderer.preparedHTML(
             source: text,
             title: title,
             theme: theme,
+            bodyFont: bodyFont,
+            headingFont: headingFont,
             baseURL: baseURL
         )
 

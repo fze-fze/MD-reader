@@ -9,12 +9,16 @@ enum DocumentPrinter {
         text: String,
         title: String,
         theme: ReaderTheme,
+        bodyFont: ReaderFontChoice = .themeDefault,
+        headingFont: ReaderFontChoice = .themeDefault,
         baseURL: URL? = nil
     ) async {
         let markup = await MarkdownPrintRenderer.preparedHTML(
             source: text,
             title: title,
             theme: theme,
+            bodyFont: bodyFont,
+            headingFont: headingFont,
             baseURL: baseURL
         )
 

@@ -13,6 +13,8 @@ struct MarkdownEditorView: View {
     let findTrigger: Int
     let liveFormatting: Bool
     let readerTheme: ReaderTheme
+    let bodyFont: ReaderFontChoice
+    let headingFont: ReaderFontChoice
     let embedded: Bool
     let sourceOffset: Int
     let accessoryRequest: AccessoryRequest?
@@ -63,6 +65,8 @@ struct MarkdownEditorView: View {
         findTrigger: Int,
         liveFormatting: Bool,
         readerTheme: ReaderTheme,
+        bodyFont: ReaderFontChoice = .themeDefault,
+        headingFont: ReaderFontChoice = .themeDefault,
         embedded: Bool = false,
         sourceOffset: Int = 0,
         accessoryRequest: AccessoryRequest? = nil,
@@ -80,6 +84,8 @@ struct MarkdownEditorView: View {
         self.findTrigger = findTrigger
         self.liveFormatting = liveFormatting
         self.readerTheme = readerTheme
+        self.bodyFont = bodyFont
+        self.headingFont = headingFont
         self.embedded = embedded
         self.sourceOffset = sourceOffset
         self.accessoryRequest = accessoryRequest
@@ -90,7 +96,12 @@ struct MarkdownEditorView: View {
     }
 
     private var theme: MarkdownTheme {
-        MarkdownTheme(readerTheme: readerTheme, colorScheme: colorScheme)
+        MarkdownTheme(
+            readerTheme: readerTheme,
+            colorScheme: colorScheme,
+            bodyFont: bodyFont,
+            headingFont: headingFont
+        )
     }
 
     var body: some View {

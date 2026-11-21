@@ -3,6 +3,11 @@ import SwiftUI
 struct MarkdownTheme: Equatable {
     let readerTheme: ReaderTheme
     let colorScheme: ColorScheme
+    var bodyFont = ReaderFontChoice.themeDefault
+    var headingFont = ReaderFontChoice.themeDefault
+
+    var bodyTypeface: DocumentTypeface { bodyFont.typeface(for: readerTheme) }
+    var headingTypeface: DocumentTypeface { headingFont.typeface(for: readerTheme) }
 
     var canvas: Color { color(claude: (0xFAF9F5, 0x1B1B19), github: (0xFFFFFF, 0x0D1117)) }
     var windowSurface: Color { color(claude: (0xF6F3ED, 0x22211F), github: (0xFAFAFA, 0x161B22)) }
