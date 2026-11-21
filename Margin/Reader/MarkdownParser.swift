@@ -200,13 +200,13 @@ nonisolated enum MarkdownParser {
         return rest.isEmpty || rest.first == " "
     }
 
-    private struct Fence {
+    struct Fence {
         let marker: Character
         let length: Int
         let info: String
     }
 
-    private static func fenceOpening(_ line: String) -> Fence? {
+    static func fenceOpening(_ line: String) -> Fence? {
         guard let marker = line.first, marker == "`" || marker == "~" else { return nil }
         let length = line.prefix(while: { $0 == marker }).count
         guard length >= 3 else { return nil }
@@ -218,7 +218,7 @@ nonisolated enum MarkdownParser {
 
     // A fence closes on a line of the same character, at least as long as the
     // opener and with nothing after it — so a ```` block can show ``` lines.
-    private static func closesFence(_ line: String, _ fence: Fence) -> Bool {
+    static func closesFence(_ line: String, _ fence: Fence) -> Bool {
         guard line.first == fence.marker else { return false }
         let length = line.prefix(while: { $0 == fence.marker }).count
         return length >= fence.length && length == line.count

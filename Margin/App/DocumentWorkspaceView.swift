@@ -7,6 +7,7 @@ struct DocumentWorkspaceView: View {
     @AppStorage("readerAppearance") private var appearance = ReaderAppearance.system
     @AppStorage("readerTextScale") private var textScale = 1.0
     @AppStorage("readerTheme") private var readerTheme = ReaderTheme.claude
+    @AppStorage("editorLiveFormatting") private var liveFormatting = true
     @State private var mode: WorkspaceMode = .read
     @State private var readerSource: String
     @State private var presentedSheet: WorkspaceSheet?
@@ -80,6 +81,7 @@ struct DocumentWorkspaceView: View {
                     textScale: textScale,
                     isFocused: $isEditorFocused,
                     findTrigger: editorFindTrigger,
+                    liveFormatting: liveFormatting,
                     readerTheme: readerTheme
                 )
                     .transition(.opacity)
@@ -91,6 +93,7 @@ struct DocumentWorkspaceView: View {
         .safeAreaInset(edge: .top, spacing: 0) {
             PagesDocumentNavigationBar(
                 mode: mode,
+                liveFormatting: $liveFormatting,
                 documentName: displayName,
                 theme: theme,
                 onDismiss: dismissWorkspace,

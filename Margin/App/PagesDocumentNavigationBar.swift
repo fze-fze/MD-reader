@@ -2,6 +2,7 @@ import SwiftUI
 
 struct PagesDocumentNavigationBar: View {
     let mode: WorkspaceMode
+    @Binding var liveFormatting: Bool
     let documentName: String
     let theme: MarkdownTheme
     let onDismiss: () -> Void
@@ -33,6 +34,7 @@ struct PagesDocumentNavigationBar: View {
 
                 PagesWorkspaceToolbar(
                     mode: mode,
+                    liveFormatting: $liveFormatting,
                     documentName: documentName,
                     accent: theme.accent,
                     glassTint: theme.navigationGlassTint,

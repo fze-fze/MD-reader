@@ -1,0 +1,106 @@
+import SwiftUI
+import Testing
+import UIKit
+@testable import Margin
+
+struct LiveMarkdownTests {
+    @Test func headingAndInlineStylesUseOriginalUTF16Offsets() {
+        let source = "## 你好🙂 **bold** and *斜体* ##"
+        let line = LiveMarkdownLine(source: source)
+        let original = source as NSString
+        #expect(line.block == .heading(2))
+        #expect(line.hidden.sorted { $0.location < $1.location }.map { original.substring(with: $0) }
+            == ["## ", "**", "**", "*", "*", " ##"])
+        #expect(line.inline.map { original.substring(with: $0.range) } == ["bold", "斜体"])
+        #expect(line.inline.map(\.intent) == [.stronglyEmphasized, .emphasized])
+    }
+
+    @Test func linksHideTheirDestinationButImagesAndMalformedMarkdownStayLiteral() {
+        let source = #"[docs](https://example.com/a_(b)) ![alt](sample.png) \*literal* **unfinished"#
+        let line = LiveMarkdownLine(source: source)
+        let original = source as NSString
+        #expect(line.hidden.map { original.substring(with: $0) } == ["[", "](https://example.com/a_(b))"])
+        #expect(line.inline.filter(\.isLink).map { original.substring(with: $0.range) } == ["docs"])
+    }
+
+    @Test func checkboxesAndCodeHaveDistinctPresentation() {
+        let source = "  - [x] `*literal*` $a_b_c$ ~~old~~"
+        let line = LiveMarkdownLine(source: source)
+        #expect(line.marker?.symbol == "☑")
+        #expect(line.marker?.range == NSRange(location: 2, length: 5))
+        #expect(line.inline.map(\.intent) == [.code, .strikethrough])
+        let fenced = LiveMarkdownLine(source: "# **literal**", code: true)
+        #expect(fenced.block == .code(fence: false))
+        #expect(fenced.hidden.isEmpty)
+        #expect(fenced.inline.isEmpty)
+    }
+
+    @Test @MainActor func changingActiveLineAndModeDoesNotChangeSourceOrSelection() async {
+        let source = "# Head\r\n**bold**\r\n"
+        let (view, styler) = makeEditor(source)
+        let heading = NSRange(location: 0, length: 0)
+        let bold = NSRange(location: 9, length: 4)
+        #expect(!isHidden(in: view, at: 0))
+        #expect(isHidden(in: view, at: 8))
+
+        view.selectedRange = bold
+        await refresh(styler)
+        #expect(isHidden(in: view, at: 0))
+        #expect(!isHidden(in: view, at: 8))
+        #expect(view.text == source)
+        #expect(view.selectedRange == bold)
+
+        styler.updateStyle(style(enabled: false))
+        await refresh(styler)
+        #expect(!isHidden(in: view, at: 0))
+        #expect(!isHidden(in: view, at: 8))
+        #expect(view.text == source)
+        #expect(view.selectedRange == bold)
+
+        view.selectedRange = heading
+        styler.updateStyle(style(enabled: true))
+        await refresh(styler)
+        #expect(!isHidden(in: view, at: 0))
+        #expect(isHidden(in: view, at: 8))
+    }
+
+    @Test @MainActor func editingAnOpeningFenceRestylesFollowingLines() async {
+        let source = "```\n**code**\n```\n**body**"
+        let (view, styler) = makeEditor(source)
+        #expect(!isHidden(in: view, at: 4))
+        #expect(isHidden(in: view, at: 17))
+
+        view.textStorage.replaceCharacters(in: NSRange(location: 0, length: 3), with: "abc")
+        view.selectedRange = NSRange(location: 3, length: 0)
+        await refresh(styler)
+        #expect(isHidden(in: view, at: 4))
+        #expect(!isHidden(in: view, at: 17))
+        #expect(view.text == "abc\n**code**\n```\n**body**")
+    }
+
+    @MainActor private func makeEditor(_ text: String) -> (UITextView, LiveMarkdownStyler) {
+        let view = UITextView(usingTextLayoutManager: false)
+        view.text = text
+        view.selectedRange = NSRange(location: 0, length: 0)
+        let styler = LiveMarkdownStyler()
+        styler.attach(to: view, style: style(enabled: true))
+        return (view, styler)
+    }
+
+    @MainActor private func style(enabled: Bool) -> LiveMarkdownStyler.Style {
+        .init(enabled: enabled, theme: MarkdownTheme(readerTheme: .github, colorScheme: .light), bodySize: 16)
+    }
+
+    @MainActor private func refresh(_ styler: LiveMarkdownStyler) async {
+        styler.scheduleRefresh()
+        await withCheckedContinuation { continuation in
+            DispatchQueue.main.async { continuation.resume() }
+        }
+    }
+
+    @MainActor private func isHidden(in view: UITextView, at character: Int) -> Bool {
+        let layout = view.layoutManager
+        layout.ensureGlyphs(forCharacterRange: NSRange(location: character, length: 1))
+        return layout.propertyForGlyph(at: layout.glyphIndexForCharacter(at: character)).contains(.null)
+    }
+}

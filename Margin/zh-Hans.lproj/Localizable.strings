@@ -11,6 +11,7 @@
 "workspace.back" = "返回文稿列表";
 "workspace.search" = "搜索";
 "workspace.edit" = "编辑";
+"editor.live_formatting" = "实时排版";
 "workspace.more" = "更多";
 "workspace.outline" = "目录";
 "workspace.reader_settings" = "阅读设置";

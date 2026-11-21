@@ -2,6 +2,7 @@ import SwiftUI
 
 struct PagesWorkspaceToolbar: View {
     let mode: WorkspaceMode
+    @Binding var liveFormatting: Bool
     let documentName: String
     let accent: Color
     let glassTint: Color
@@ -55,6 +56,11 @@ struct PagesWorkspaceToolbar: View {
     // shows a (potentially stale) title.
     private var documentMenu: some View {
         Menu {
+            if mode == .edit {
+                Section {
+                    Toggle("editor.live_formatting", isOn: $liveFormatting)
+                }
+            }
             Section(documentName) {
                 Button("workspace.outline", systemImage: "list.bullet.indent", action: onOutline)
                 Button("workspace.document_info", systemImage: "info.circle", action: onDocumentInfo)

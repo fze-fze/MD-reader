@@ -6,6 +6,7 @@ struct NativeMarkdownTextView: UIViewRepresentable {
     @Binding var selectedRange: NSRange
     @Binding var isFocused: Bool
     let findTrigger: Int
+    let liveFormatting: Bool
     let theme: MarkdownTheme
     let readerTheme: ReaderTheme
     let bodySize: Double
@@ -36,16 +37,11 @@ struct NativeMarkdownTextView: UIViewRepresentable {
         view.isFindInteractionEnabled = true
         view.accessibilityLabel = L10n.string("editor.accessibility_label")
         view.text = text
-        applyTypography(to: view)
         if selectedRange.location > 0, NSMaxRange(selectedRange) <= view.textStorage.length {
             view.selectedRange = selectedRange
             scrollToSelection(in: view)
         }
-        context.coordinator.recordTypography(
-            readerTheme: readerTheme,
-            bodySize: bodySize,
-            textColor: UIColor(theme.textPrimary)
-        )
+        context.coordinator.styler.attach(to: view, style: editorStyle)
         return view
     }
 
@@ -70,21 +66,7 @@ struct NativeMarkdownTextView: UIViewRepresentable {
             view.backgroundColor = UIColor(theme.canvas)
             view.tintColor = UIColor(theme.accent)
         }
-        let typographyChanged = context.coordinator.typographyChanged(
-            readerTheme: readerTheme,
-            bodySize: bodySize,
-            textColor: UIColor(theme.textPrimary)
-        )
-        if !hasMarkedText, typographyChanged {
-            view.textColor = UIColor(theme.textPrimary)
-            view.font = documentFont
-            applyTypography(to: view)
-            context.coordinator.recordTypography(
-                readerTheme: readerTheme,
-                bodySize: bodySize,
-                textColor: UIColor(theme.textPrimary)
-            )
-        }
+        context.coordinator.styler.updateStyle(editorStyle)
 
         if isFocused != view.isFirstResponder {
             Task { @MainActor in
@@ -136,6 +118,10 @@ struct NativeMarkdownTextView: UIViewRepresentable {
         MarkdownTypography.documentUIFont(theme: readerTheme, size: bodySize)
     }
 
+    private var editorStyle: LiveMarkdownStyler.Style {
+        .init(enabled: liveFormatting, theme: theme, bodySize: bodySize)
+    }
+
     // Assigning `UITextView.text` moves the caret to the end of the document
     // and schedules an auto-scroll to it on the next layout pass, so a whole-
     // text assignment jumps the viewport no matter what is restored afterwards.
@@ -144,13 +130,6 @@ struct NativeMarkdownTextView: UIViewRepresentable {
     private func replaceChangedRange(in view: UITextView, with newText: String) {
         let change = Self.changedRange(from: view.text, to: newText)
         view.textStorage.replaceCharacters(in: change.range, with: change.replacement)
-        applyTypography(
-            to: view,
-            range: NSRange(
-                location: change.range.location,
-                length: (change.replacement as NSString).length
-            )
-        )
     }
 
     nonisolated static func changedRange(
@@ -187,31 +166,10 @@ struct NativeMarkdownTextView: UIViewRepresentable {
         return (range, replacement)
     }
 
-    private func applyTypography(to view: UITextView) {
-        applyTypography(
-            to: view,
-            range: NSRange(location: 0, length: view.textStorage.length)
-        )
-    }
-
-    private func applyTypography(to view: UITextView, range: NSRange) {
-        let paragraphStyle = NSMutableParagraphStyle()
-        paragraphStyle.lineHeightMultiple = 1.36
-
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: documentFont,
-            .foregroundColor: UIColor(theme.textPrimary),
-            .paragraphStyle: paragraphStyle
-        ]
-        view.typingAttributes = attributes
-
-        guard range.length > 0 else { return }
-        view.textStorage.addAttributes(attributes, range: range)
-    }
-
     @MainActor
     final class Coordinator: NSObject, UITextViewDelegate {
         var parent: NativeMarkdownTextView
+        let styler = LiveMarkdownStyler()
         var lastFindTrigger = 0
         var lastTheme: MarkdownTheme?
         // The text last exchanged with the binding, in either direction.
@@ -219,9 +177,6 @@ struct NativeMarkdownTextView: UIViewRepresentable {
         // Set when an edit could not be reported yet because an input method
         // was still composing.
         private var hasUnreportedEdit = false
-        private var lastReaderTheme: ReaderTheme?
-        private var lastBodySize: Double?
-        private var lastTextColor: UIColor?
 
         init(parent: NativeMarkdownTextView) {
             self.parent = parent
@@ -258,6 +213,7 @@ struct NativeMarkdownTextView: UIViewRepresentable {
 
         func textViewDidChangeSelection(_ textView: UITextView) {
             guard textView.markedTextRange == nil else { return }
+            styler.scheduleRefresh()
             if hasUnreportedEdit {
                 reportText(from: textView)
             }
@@ -275,28 +231,9 @@ struct NativeMarkdownTextView: UIViewRepresentable {
             parent.isFocused = false
         }
 
-        func typographyChanged(
-            readerTheme: ReaderTheme,
-            bodySize: Double,
-            textColor: UIColor
-        ) -> Bool {
-            lastReaderTheme != readerTheme
-                || lastBodySize != bodySize
-                || lastTextColor?.isEqual(textColor) != true
-        }
-
-        func recordTypography(
-            readerTheme: ReaderTheme,
-            bodySize: Double,
-            textColor: UIColor
-        ) {
-            lastReaderTheme = readerTheme
-            lastBodySize = bodySize
-            lastTextColor = textColor
-        }
-
         private func synchronizeCommittedText(from textView: UITextView) {
             guard textView.markedTextRange == nil else { return }
+            styler.scheduleRefresh()
             reportText(from: textView)
             parent.selectedRange = textView.selectedRange
         }
