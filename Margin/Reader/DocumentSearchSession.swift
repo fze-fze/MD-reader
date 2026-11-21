@@ -25,7 +25,12 @@ final class DocumentSearchSession {
     private(set) var navigationRevision = 0
     private(set) var isActive = false
 
-    private var index = DocumentSearchIndex()
+    // The index costs an inline-Markdown parse per block, so it is built from
+    // `blocks` off the main actor the first time search needs it rather than
+    // on every document change.
+    @ObservationIgnored private var blocks: [MarkdownBlock] = []
+    @ObservationIgnored private var index: DocumentSearchIndex? = DocumentSearchIndex()
+    @ObservationIgnored private var indexBuild: (revision: Int, task: Task<DocumentSearchIndex, Never>)?
     private var indexRevision = 0
     private var searchRevision = 0
 
@@ -65,13 +70,56 @@ final class DocumentSearchSession {
     }
 
     func replaceIndex(_ index: DocumentSearchIndex) {
+        blocks = []
         self.index = index
+        indexBuild = nil
         indexRevision &+= 1
         resetResults()
     }
 
+    func replaceBlocks(_ blocks: [MarkdownBlock]) {
+        self.blocks = blocks
+        index = nil
+        indexBuild = nil
+        indexRevision &+= 1
+        resetResults()
+        if isActive { warmIndex() }
+    }
+
     func activate() {
         isActive = true
+        // Start indexing while the user is still typing the query.
+        warmIndex()
+    }
+
+    private func warmIndex() {
+        guard index == nil else { return }
+        Task { _ = await currentIndex() }
+    }
+
+    // The index for the current blocks, built at most once per revision no
+    // matter how many searches are waiting on it. Nil when the document
+    // changed underneath the build.
+    private func currentIndex() async -> DocumentSearchIndex? {
+        if let index { return index }
+
+        let revision = indexRevision
+        let build: Task<DocumentSearchIndex, Never>
+        if let indexBuild, indexBuild.revision == revision {
+            build = indexBuild.task
+        } else {
+            let snapshot = blocks
+            build = Task.detached(priority: .userInitiated) {
+                DocumentSearchIndex(blocks: snapshot)
+            }
+            indexBuild = (revision, build)
+        }
+
+        let built = await build.value
+        guard revision == indexRevision else { return nil }
+        index = built
+        indexBuild = nil
+        return built
     }
 
     func deactivate() {
@@ -108,7 +156,7 @@ final class DocumentSearchSession {
         }
         guard !Task.isCancelled, isActive else { return }
 
-        let indexSnapshot = index
+        guard let indexSnapshot = await currentIndex() else { return }
         let results: [DocumentSearchIndex.Match]
         do {
             results = try await indexSnapshot.matches(for: querySnapshot)

@@ -31,6 +31,35 @@ nonisolated enum SourceLines {
         return lines
     }
 
+    // UTF-16 offset of the first character of `line` (clamped to the end of
+    // the document) — the unit UITextView measures selections in.
+    static func utf16Offset(ofLine line: Int, in source: String) -> Int {
+        guard line > 0 else { return 0 }
+        var offset = 0
+        var current = 0
+        for character in source {
+            offset += character.utf16.count
+            if character.isNewline {
+                current += 1
+                if current == line { return offset }
+            }
+        }
+        return offset
+    }
+
+    // The line holding the character at `utf16Offset`.
+    static func lineIndex(atUTF16Offset utf16Offset: Int, in source: String) -> Int {
+        var offset = 0
+        var line = 0
+        for character in source {
+            let next = offset + character.utf16.count
+            if next > utf16Offset { break }
+            offset = next
+            if character.isNewline { line += 1 }
+        }
+        return line
+    }
+
     static func join(_ lines: [Line]) -> String {
         lines.reduce(into: "") { result, line in
             result += line.text + line.terminator

@@ -70,9 +70,13 @@ struct SelectableInlineText: UIViewRepresentable {
         )
         // Reassigning the text drops any live selection, so skip the write when
         // nothing actually changed — updateUIView runs on every scroll pass.
-        if uiView.attributedText != rendered.text {
+        // Unsearched text comes back from the cache as the same instance, so
+        // the usual answer costs a pointer comparison.
+        guard uiView.renderedText !== rendered.text else { return }
+        if uiView.renderedText?.isEqual(to: rendered.text) != true {
             uiView.attributedText = rendered.text
         }
+        uiView.renderedText = rendered.text
     }
 
     func sizeThatFits(
@@ -86,17 +90,10 @@ struct SelectableInlineText: UIViewRepresentable {
               let width = proposal.width,
               width > 0,
               width < .greatestFiniteMagnitude else {
-            let fitted = uiView.sizeThatFits(
-                CGSize(
-                    width: CGFloat.greatestFiniteMagnitude,
-                    height: CGFloat.greatestFiniteMagnitude
-                )
-            )
+            let fitted = uiView.fittedSize(width: .greatestFiniteMagnitude)
             return CGSize(width: ceil(fitted.width), height: ceil(fitted.height))
         }
-        let fitted = uiView.sizeThatFits(
-            CGSize(width: width, height: .greatestFiniteMagnitude)
-        )
+        let fitted = uiView.fittedSize(width: width)
         return CGSize(width: width, height: ceil(fitted.height))
     }
 }
@@ -104,6 +101,27 @@ struct SelectableInlineText: UIViewRepresentable {
 // A UITextView that behaves like a paragraph of a document rather than a text
 // field: no scrolling of its own, and no keyboard-related affordances.
 final class ReaderTextView: UITextView {
+    // The string last handed over by `SelectableInlineText`, kept so an update
+    // can be compared against it without copying the text storage back out.
+    var renderedText: NSAttributedString?
+
+    // SwiftUI asks for the size several times per layout pass with the same
+    // width; each answer is a full TextKit layout unless it is remembered.
+    private var fittedSizeCache: (width: CGFloat, size: CGSize)?
+
+    override var attributedText: NSAttributedString! {
+        didSet { fittedSizeCache = nil }
+    }
+
+    func fittedSize(width: CGFloat) -> CGSize {
+        if let fittedSizeCache, fittedSizeCache.width == width {
+            return fittedSizeCache.size
+        }
+        let size = sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude))
+        fittedSizeCache = (width, size)
+        return size
+    }
+
     // A selectable UITextView installs its own pan gesture for text dragging,
     // which competes with the reader's ScrollView. Letting the scroll view win
     // keeps flicking through a document from turning into a text drag.

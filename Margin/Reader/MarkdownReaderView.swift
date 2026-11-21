@@ -7,12 +7,17 @@ struct MarkdownReaderView: View {
     let textScale: Double
     let baseURL: URL?
     let readerTheme: ReaderTheme
+    let position: ReadingPosition
+    let positionRestoreRevision: Int
     let onToggleTask: (Int) -> Void
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @ScaledMetric(relativeTo: .body) private var bodySize = 16.0
     @State private var blocks: [MarkdownBlock] = []
+    // The source `blocks` was parsed from, to tell a finished parse from one
+    // still on its way.
+    @State private var parsedSource: String?
 
     private var theme: MarkdownTheme {
         MarkdownTheme(readerTheme: readerTheme, colorScheme: colorScheme)
@@ -36,9 +41,11 @@ struct MarkdownReaderView: View {
                                 : nil,
                             onToggleTask: onToggleTask
                         )
+                            .equatable()
                             .id(block.id)
                     }
                 }
+                .scrollTargetLayout()
                 .frame(maxWidth: theme.contentMaxWidth, alignment: .leading)
                 .frame(maxWidth: .infinity)
                 .padding(.horizontal, horizontalSizeClass == .compact ? 20 : 32)
@@ -47,15 +54,27 @@ struct MarkdownReaderView: View {
             }
             .scrollIndicators(.hidden)
             .background(theme.canvas)
+            .onScrollTargetVisibilityChange(idType: Int.self, threshold: 0.01) { visibleIDs in
+                position.visibleBlockIDs = visibleIDs
+            }
+            .onChange(of: positionRestoreRevision) {
+                // With an unchanged document there is no parse to wait for.
+                if parsedSource == source {
+                    restorePendingPosition(using: proxy)
+                }
+            }
             .task(id: source) {
                 let sourceSnapshot = source
-                let result = await Task.detached(priority: .userInitiated) {
-                    let parsedBlocks = MarkdownParser.parse(sourceSnapshot)
-                    return (parsedBlocks, DocumentSearchIndex(blocks: parsedBlocks))
+                let parsedBlocks = await Task.detached(priority: .userInitiated) {
+                    MarkdownParser.parse(sourceSnapshot)
                 }.value
                 guard !Task.isCancelled else { return }
-                blocks = result.0
-                searchSession.replaceIndex(result.1)
+                // Only the parse stands between a source change and the
+                // screen; the search index is built when search asks for it.
+                blocks = parsedBlocks
+                parsedSource = sourceSnapshot
+                searchSession.replaceBlocks(parsedBlocks)
+                restorePendingPosition(using: proxy)
             }
             .onChange(of: scrollTarget) { _, target in
                 guard let target else { return }
@@ -70,6 +89,16 @@ struct MarkdownReaderView: View {
         }
     }
 
+    // Brings the block holding the line the editor left off at on screen,
+    // unless the reader is already showing it.
+    private func restorePendingPosition(using proxy: ScrollViewProxy) {
+        guard let line = position.pendingLine else { return }
+        position.pendingLine = nil
+        guard let target = blocks.last(where: { $0.id <= line })?.id,
+              !position.visibleBlockIDs.contains(target) else { return }
+        proxy.scrollTo(target, anchor: .top)
+    }
+
     private func scrollToCurrentMatch(using proxy: ScrollViewProxy) {
         guard let activeMatch = searchSession.activeMatch else { return }
         withAnimation(.snappy) {
@@ -78,7 +107,20 @@ struct MarkdownReaderView: View {
     }
 }
 
-private struct MarkdownBlockView: View {
+private struct MarkdownBlockView: View, Equatable {
+    // Lets SwiftUI skip blocks whose inputs did not change when the document
+    // is re-parsed or the search state moves — a task toggle or a keystroke
+    // in the search field then redraws one block instead of every visible
+    // one. `onToggleTask` is left out: it captures only the document binding.
+    static func == (lhs: MarkdownBlockView, rhs: MarkdownBlockView) -> Bool {
+        lhs.block == rhs.block
+            && lhs.bodySize == rhs.bodySize
+            && lhs.theme == rhs.theme
+            && lhs.baseURL == rhs.baseURL
+            && lhs.searchText == rhs.searchText
+            && lhs.activeOccurrenceIndex == rhs.activeOccurrenceIndex
+    }
+
     let block: MarkdownBlock
     let bodySize: Double
     let theme: MarkdownTheme

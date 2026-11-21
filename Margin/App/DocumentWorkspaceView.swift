@@ -14,6 +14,9 @@ struct DocumentWorkspaceView: View {
     @State private var isSearchPresented = false
     @State private var scrollTarget: Int?
     @State private var isEditorFocused = false
+    @State private var readingPosition = ReadingPosition()
+    @State private var editorStartLocation = 0
+    @State private var positionRestoreRevision = 0
     @State private var editorFindTrigger = 0
     @State private var requestedDocumentAction: DocumentActionRequest?
     // The URL after an in-app rename. DocumentGroup's published fileURL keeps
@@ -61,6 +64,8 @@ struct DocumentWorkspaceView: View {
                 textScale: textScale,
                 baseURL: effectiveFileURL?.deletingLastPathComponent(),
                 readerTheme: readerTheme,
+                position: readingPosition,
+                positionRestoreRevision: positionRestoreRevision,
                 onToggleTask: toggleTask
             )
             .opacity(mode == .read ? 1 : 0)
@@ -70,6 +75,8 @@ struct DocumentWorkspaceView: View {
             if mode == .edit {
                 MarkdownEditorView(
                     text: $text,
+                    initialLocation: editorStartLocation,
+                    position: readingPosition,
                     textScale: textScale,
                     isFocused: $isEditorFocused,
                     findTrigger: editorFindTrigger,
@@ -168,6 +175,11 @@ struct DocumentWorkspaceView: View {
     private func beginEditing() {
         dismissSearch()
         readerSource = text
+        // Open the editor on the passage being read, not at the top.
+        editorStartLocation = readingPosition.topVisibleLine.map {
+            SourceLines.utf16Offset(ofLine: $0, in: text)
+        } ?? 0
+        readingPosition.editorCaretLocation = editorStartLocation
         mode = .edit
         Task { @MainActor in
             await Task.yield()
@@ -177,6 +189,14 @@ struct DocumentWorkspaceView: View {
 
     private func finishEditing() {
         isEditorFocused = false
+        if mode == .edit {
+            // And come back to the reader where the caret was left.
+            readingPosition.pendingLine = SourceLines.lineIndex(
+                atUTF16Offset: readingPosition.editorCaretLocation,
+                in: text
+            )
+            positionRestoreRevision &+= 1
+        }
         readerSource = text
         mode = .read
     }
@@ -215,6 +235,8 @@ struct DocumentWorkspaceView: View {
                 readerTheme: readerTheme
             ) { headingID in
                 finishEditing()
+                // The heading wins over returning to the caret.
+                readingPosition.pendingLine = nil
                 scrollTarget = headingID
             }
         case .settings:
