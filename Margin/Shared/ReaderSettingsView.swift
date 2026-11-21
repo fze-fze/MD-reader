@@ -46,6 +46,10 @@ struct ReaderSettingsView: View {
                         }
                     }
                     .pickerStyle(.segmented)
+                    // A segmented control already draws its own track; inside
+                    // a row card it reads as a box within a box.
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
                 }
 
                 Section("settings.section.typography") {
