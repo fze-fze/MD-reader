@@ -35,13 +35,33 @@ nonisolated struct LiveMarkdownLine {
         // While editing, keep the draft literal if line-by-line parsing
         // could hide operators or punctuation inside a delimited span.
         guard source.utf8.count <= 8_192 else { return false }
-        if source.utf8.contains(96), source.contains(where: \.isNewline) { return false }
+        if source.utf8.contains(96), source.contains(where: \.isNewline), hasMultilineCodeSpan(source) {
+            return false
+        }
         if source.utf8.contains(36) {
             return !source.split(whereSeparator: \.isNewline).contains {
                 $0.drop(while: { $0 == " " || $0 == "\t" }).hasPrefix("$$")
             }
         }
         return true
+    }
+
+    private static func hasMultilineCodeSpan(_ source: String) -> Bool {
+        let characters = Array(source)
+        var index = 0
+        while index < characters.count {
+            switch characters[index] {
+            case "\\":
+                index += 2
+            case "`":
+                let end = InlineScanning.endOfCodeSpan(in: characters, from: index)
+                if characters[index..<end].contains(where: \.isNewline) { return true }
+                index = end
+            default:
+                index += 1
+            }
+        }
+        return false
     }
 
     init(source: String, code: Bool = false, fence: Bool = false) {

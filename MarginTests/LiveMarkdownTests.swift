@@ -9,8 +9,27 @@ struct LiveMarkdownTests {
         #expect(!LiveMarkdownLine.canFormatDraft("$$a*b*c$$"))
         #expect(!LiveMarkdownLine.canFormatDraft("  $$\r\na*b*c\r\n$$"))
         #expect(!LiveMarkdownLine.canFormatDraft("`first\n**literal**`"))
+        #expect(!LiveMarkdownLine.canFormatDraft("``first `\r\n**literal**``"))
         #expect(LiveMarkdownLine.canFormatDraft("One `code` span"))
         #expect(LiveMarkdownLine.canFormatDraft("- **Emphasis**\n- Math $a*b*c$"))
+        #expect(LiveMarkdownLine.canFormatDraft(#"Escaped \`tick"# + "\nNext `code` span"))
+    }
+
+    @Test @MainActor func inlineCodeInOneListItemKeepsOtherItemFormatted() async {
+        let source = "- Run `make`\n- **Check output**"
+        let original = source as NSString
+        let code = original.range(of: "`make`")
+        let emphasis = original.range(of: "**Check output**")
+        let (view, styler) = makeEditor(source, enabled: LiveMarkdownLine.canFormatDraft(source))
+        #expect(!isHidden(in: view, at: code.location))
+        #expect(isHidden(in: view, at: emphasis.location))
+        #expect(isHidden(in: view, at: NSMaxRange(emphasis) - 1))
+
+        view.selectedRange = NSRange(location: emphasis.location, length: 0)
+        await refresh(styler)
+        #expect(isHidden(in: view, at: code.location))
+        #expect(!isHidden(in: view, at: emphasis.location))
+        #expect(view.text.utf16.elementsEqual(source.utf16))
     }
 
     @Test @MainActor func switchingEquivalentUnicodeRegionsLoadsExactTextBeforeSelection() {
@@ -162,12 +181,12 @@ struct LiveMarkdownTests {
         #expect(view.text == "Today: **field notes**\nNext line")
     }
 
-    @MainActor private func makeEditor(_ text: String) -> (UITextView, LiveMarkdownStyler) {
+    @MainActor private func makeEditor(_ text: String, enabled: Bool = true) -> (UITextView, LiveMarkdownStyler) {
         let view = UITextView(usingTextLayoutManager: false)
         view.text = text
         view.selectedRange = NSRange(location: 0, length: 0)
         let styler = LiveMarkdownStyler()
-        styler.attach(to: view, style: style(enabled: true))
+        styler.attach(to: view, style: style(enabled: enabled))
         return (view, styler)
     }
 
