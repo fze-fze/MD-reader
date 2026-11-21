@@ -10,6 +10,16 @@ struct NativeMarkdownTextView: UIViewRepresentable {
     let theme: MarkdownTheme
     let readerTheme: ReaderTheme
     let bodySize: Double
+    var embedded = false
+    var regionID: UUID? = nil
+    var isComposing: Binding<Bool>? = nil
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+    private var textInsets: UIEdgeInsets {
+        if embedded { return UIEdgeInsets(top: 4, left: 0, bottom: 4, right: 0) }
+        let padding = MarkdownTypography.columnPadding(compact: horizontalSizeClass == .compact)
+        return UIEdgeInsets(top: padding.top, left: padding.leading, bottom: 36, right: padding.trailing)
+    }
 
     func makeCoordinator() -> Coordinator {
         Coordinator(parent: self)
@@ -27,39 +37,57 @@ struct NativeMarkdownTextView: UIViewRepresentable {
         view.tintColor = UIColor(theme.accent)
         view.font = documentFont
         view.adjustsFontForContentSizeCategory = true
-        view.alwaysBounceVertical = true
+        view.isScrollEnabled = !embedded
+        view.alwaysBounceVertical = !embedded
         view.keyboardDismissMode = .interactive
-        view.textContainerInset = UIEdgeInsets(top: 24, left: 16, bottom: 36, right: 16)
-        view.textContainer.lineFragmentPadding = 4
+        view.textContainerInset = textInsets
+        view.textContainer.lineFragmentPadding = 0
         view.smartDashesType = .no
         view.smartQuotesType = .no
         view.smartInsertDeleteType = .no
-        view.isFindInteractionEnabled = true
+        view.isFindInteractionEnabled = !embedded
         view.accessibilityLabel = L10n.string("editor.accessibility_label")
         view.text = text
         if selectedRange.location > 0, NSMaxRange(selectedRange) <= view.textStorage.length {
             view.selectedRange = selectedRange
-            scrollToSelection(in: view)
+            if !embedded { scrollToSelection(in: view) }
         }
         context.coordinator.styler.attach(to: view, style: editorStyle)
         return view
     }
 
+    func sizeThatFits(_ proposal: ProposedViewSize, uiView: UITextView, context: Context) -> CGSize? {
+        guard embedded, let width = proposal.width, width.isFinite, width > 0 else { return nil }
+        let fitting = uiView.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude))
+        return CGSize(width: width, height: ceil(fitting.height))
+    }
+
     func updateUIView(_ view: UITextView, context: Context) {
         context.coordinator.parent = self
+        if context.coordinator.regionID != regionID {
+            context.coordinator.regionID = regionID
+            view.undoManager?.removeAllActions()
+        }
+        if view.textContainerInset != textInsets {
+            view.textContainerInset = textInsets
+        }
         let hasMarkedText = view.markedTextRange != nil
         // This runs after every keystroke. `syncedText` is the string the
         // text view itself just reported, so the usual comparison is between
         // two references to the same storage; reading `view.text` here would
         // copy the whole document each time.
-        if !hasMarkedText, text != context.coordinator.syncedText {
-            replaceChangedRange(in: view, with: text)
-            context.coordinator.syncedText = text
-        }
-        if !hasMarkedText,
-           view.selectedRange != selectedRange,
-           NSMaxRange(selectedRange) <= view.textStorage.length {
-            view.selectedRange = selectedRange
+        if !hasMarkedText {
+            let coordinator = context.coordinator
+            coordinator.isSynchronizing = true
+            defer { coordinator.isSynchronizing = false }
+            if text != coordinator.syncedText {
+                replaceChangedRange(in: view, with: text)
+                coordinator.syncedText = text
+            }
+            if view.selectedRange != selectedRange, NSMaxRange(selectedRange) <= view.textStorage.length {
+                view.selectedRange = selectedRange
+                coordinator.styler.scheduleRefresh()
+            }
         }
         if context.coordinator.lastTheme != theme {
             context.coordinator.lastTheme = theme
@@ -172,6 +200,8 @@ struct NativeMarkdownTextView: UIViewRepresentable {
         let styler = LiveMarkdownStyler()
         var lastFindTrigger = 0
         var lastTheme: MarkdownTheme?
+        var regionID: UUID?
+        var isSynchronizing = false
         // The text last exchanged with the binding, in either direction.
         var syncedText: String
         // Set when an edit could not be reported yet because an input method
@@ -182,9 +212,11 @@ struct NativeMarkdownTextView: UIViewRepresentable {
             self.parent = parent
             syncedText = parent.text
             lastTheme = parent.theme
+            regionID = parent.regionID
         }
 
         func textViewDidChange(_ textView: UITextView) {
+            guard !isSynchronizing else { return }
             hasUnreportedEdit = true
             synchronizeCommittedText(from: textView)
         }
@@ -212,7 +244,10 @@ struct NativeMarkdownTextView: UIViewRepresentable {
         }
 
         func textViewDidChangeSelection(_ textView: UITextView) {
-            guard textView.markedTextRange == nil else { return }
+            guard !isSynchronizing else { return }
+            let composing = textView.markedTextRange != nil
+            updateComposition(composing)
+            guard !composing else { return }
             styler.scheduleRefresh()
             if hasUnreportedEdit {
                 reportText(from: textView)
@@ -232,10 +267,18 @@ struct NativeMarkdownTextView: UIViewRepresentable {
         }
 
         private func synchronizeCommittedText(from textView: UITextView) {
-            guard textView.markedTextRange == nil else { return }
+            let composing = textView.markedTextRange != nil
+            updateComposition(composing)
+            guard !composing else { return }
             styler.scheduleRefresh()
             reportText(from: textView)
             parent.selectedRange = textView.selectedRange
+        }
+
+        private func updateComposition(_ composing: Bool) {
+            if let binding = parent.isComposing, binding.wrappedValue != composing {
+                binding.wrappedValue = composing
+            }
         }
 
         private func reportText(from textView: UITextView) {

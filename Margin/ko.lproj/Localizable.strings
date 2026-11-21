@@ -22,7 +22,9 @@
 "appearance.light" = "라이트";
 "appearance.dark" = "다크";
 "workspace.mode.read" = "읽기";
-"workspace.mode.edit" = "편집";
+"workspace.mode.label" = "문서 모드";
+"workspace.mode.live" = "실시간";
+"workspace.mode.source" = "원본";
 
 "settings.section.theme" = "테마";
 "settings.document_theme" = "문서 테마";

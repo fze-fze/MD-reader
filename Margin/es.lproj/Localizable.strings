@@ -22,7 +22,9 @@
 "appearance.light" = "Claro";
 "appearance.dark" = "Oscuro";
 "workspace.mode.read" = "Leer";
-"workspace.mode.edit" = "Editar";
+"workspace.mode.label" = "Modo del documento";
+"workspace.mode.live" = "En vivo";
+"workspace.mode.source" = "Fuente";
 
 "settings.section.theme" = "Tema";
 "settings.document_theme" = "Tema del documento";

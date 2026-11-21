@@ -22,7 +22,9 @@
 "appearance.light" = "淺色";
 "appearance.dark" = "深色";
 "workspace.mode.read" = "閱讀";
-"workspace.mode.edit" = "編輯";
+"workspace.mode.label" = "文件模式";
+"workspace.mode.live" = "即時";
+"workspace.mode.source" = "原始碼";
 
 "settings.section.theme" = "主題";
 "settings.document_theme" = "文件主題";

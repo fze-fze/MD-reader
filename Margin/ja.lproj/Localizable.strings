@@ -22,7 +22,9 @@
 "appearance.light" = "ライト";
 "appearance.dark" = "ダーク";
 "workspace.mode.read" = "閲覧";
-"workspace.mode.edit" = "編集";
+"workspace.mode.label" = "文書モード";
+"workspace.mode.live" = "ライブ";
+"workspace.mode.source" = "ソース";
 
 "settings.section.theme" = "テーマ";
 "settings.document_theme" = "書類のテーマ";

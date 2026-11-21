@@ -1,13 +1,9 @@
 import SwiftUI
 
 struct PagesWorkspaceToolbar: View {
-    let mode: WorkspaceMode
-    @Binding var liveFormatting: Bool
     let documentName: String
-    let accent: Color
     let glassTint: Color
     let onSearch: () -> Void
-    let onToggleMode: () -> Void
     let onSettings: () -> Void
     let onOutline: () -> Void
     let onDocumentInfo: () -> Void
@@ -26,17 +22,6 @@ struct PagesWorkspaceToolbar: View {
                     .contentShape(.rect)
             }
             .keyboardShortcut("f", modifiers: .command)
-
-            Button(action: onToggleMode) {
-                Label(
-                    mode == .read ? "workspace.edit" : "common.done",
-                    systemImage: mode == .read ? "square.and.pencil" : "checkmark.circle.fill"
-                )
-                .font(.title2.bold())
-                .frame(width: 44, height: 44)
-                .contentShape(.rect)
-            }
-            .foregroundStyle(accent)
 
             documentMenu
         }
@@ -57,9 +42,6 @@ struct PagesWorkspaceToolbar: View {
     private var documentMenu: some View {
         Menu {
             Section(documentName) {
-                if mode == .edit {
-                    Toggle("editor.live_formatting", isOn: $liveFormatting)
-                }
                 Button("workspace.outline", systemImage: "list.bullet.indent", action: onOutline)
                 Button("workspace.document_info", systemImage: "info.circle", action: onDocumentInfo)
                 Button("workspace.reader_settings", systemImage: "paintbrush", action: onSettings)

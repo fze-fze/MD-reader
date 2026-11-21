@@ -48,8 +48,7 @@ struct MarkdownReaderView: View {
                 .scrollTargetLayout()
                 .frame(maxWidth: theme.contentMaxWidth, alignment: .leading)
                 .frame(maxWidth: .infinity)
-                .padding(.horizontal, horizontalSizeClass == .compact ? 20 : 32)
-                .padding(.top, horizontalSizeClass == .compact ? 24 : 32)
+                .padding(MarkdownTypography.columnPadding(compact: horizontalSizeClass == .compact))
                 .padding(.bottom, horizontalSizeClass == .compact ? 84 : 104)
             }
             .scrollIndicators(.hidden)
@@ -145,7 +144,7 @@ struct MarkdownReaderView: View {
     }
 }
 
-private struct MarkdownBlockView: View, Equatable {
+struct MarkdownBlockView: View, Equatable {
     // Lets SwiftUI skip blocks whose inputs did not change when the document
     // is re-parsed or the search state moves — a task toggle or a keystroke
     // in the search field then redraws one block instead of every visible
