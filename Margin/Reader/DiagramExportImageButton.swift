@@ -19,18 +19,23 @@ struct DiagramExportImageButton: View {
 
     var body: some View {
         Button(action: export) {
+            // Icon only, like the copy button it replaces; text appears
+            // just for the failure message.
             HStack(spacing: 5) {
                 icon
-                Text(title)
-                    .font(.caption)
+                if state == .failed {
+                    Text("reader.export_image_failed")
+                        .font(.caption)
+                        .transition(.opacity)
+                }
             }
-            .padding(.horizontal, 8)
-            .frame(minHeight: 28)
+            .padding(.horizontal, state == .failed ? 8 : 0)
+            .frame(minWidth: state == .failed ? nil : 28, minHeight: 28)
             .background(
                 state == .failed ? theme.codeBorder.opacity(0.5) : .clear,
                 in: .rect(cornerRadius: 6)
             )
-            .frame(minHeight: 44)
+            .frame(minWidth: 44, minHeight: 44)
         }
         .buttonStyle(.plain)
         .foregroundStyle(image == nil ? theme.textSecondary.opacity(0.5) : theme.textSecondary)
@@ -47,10 +52,6 @@ struct DiagramExportImageButton: View {
             guard !Task.isCancelled else { return }
             withAnimation(feedbackAnimation) { state = .idle }
         }
-    }
-
-    private var title: LocalizedStringKey {
-        state == .failed ? "reader.export_image_failed" : "reader.export_image"
     }
 
     @ViewBuilder
