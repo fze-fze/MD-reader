@@ -88,6 +88,8 @@ private struct MarkdownBlockView: View {
     let onToggleTask: (Int) -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    // Width of the reading column, so a narrow table's rules still span it.
+    @State private var tableContainerWidth: CGFloat = 0
 
     var body: some View {
         switch block.kind {
@@ -168,7 +170,7 @@ private struct MarkdownBlockView: View {
         HStack(spacing: 0) {
             Rectangle()
                 .fill(theme.quoteRule)
-                .frame(width: 2)
+                .frame(width: 3)
             SelectableInlineText(
                 source: text,
                 fonts: inlineUIFonts(size: bodySize),
@@ -183,7 +185,15 @@ private struct MarkdownBlockView: View {
             .padding(.vertical, 9)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(theme.quoteFill, in: RoundedRectangle(cornerRadius: 10))
+        .background(theme.quoteFill)
+        .clipShape(
+            .rect(
+                topLeadingRadius: 1.5,
+                bottomLeadingRadius: 1.5,
+                bottomTrailingRadius: 10,
+                topTrailingRadius: 10
+            )
+        )
         .padding(.vertical, bodySize * 0.39)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(L10n.format("reader.quote_accessibility", text))
@@ -259,7 +269,9 @@ private struct MarkdownBlockView: View {
                         source: item.text,
                         fonts: itemFonts,
                         mathFontSize: bodySize,
-                        foregroundColor: UIColor(theme.textPrimary),
+                        foregroundColor: UIColor(
+                            item.isChecked == true ? theme.textSecondary : theme.textPrimary
+                        ),
                         theme: theme,
                         searchText: searchText,
                         activeOccurrenceIndex: activeOccurrenceIndex,
@@ -277,11 +289,15 @@ private struct MarkdownBlockView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text(language?.uppercased() ?? L10n.string("reader.code"))
-                    .font(.caption)
+                    .font(.system(.caption2, design: theme.codeFont, weight: .medium))
+                    .tracking(0.6)
                     .foregroundStyle(theme.textSecondary)
                 Spacer()
                 CodeCopyButton(source: source, theme: theme)
             }
+            // The copy button keeps its 44pt target without the header
+            // row growing a band of dead space above the code.
+            .padding(.vertical, -6)
             ScrollView(.horizontal) {
                 SearchablePlainText(
                     source: source,
@@ -347,10 +363,16 @@ private struct MarkdownBlockView: View {
                     }
                 }
             }
+            .frame(minWidth: tableContainerWidth, alignment: .leading)
             .overlay(alignment: .top) { Divider().overlay(theme.tableStrongRule) }
             .overlay(alignment: .bottom) { Divider().overlay(theme.tableStrongRule) }
         }
         .scrollIndicators(.hidden)
+        .onGeometryChange(for: CGFloat.self) { proxy in
+            proxy.size.width
+        } action: { width in
+            tableContainerWidth = width
+        }
         .padding(.vertical, bodySize * 0.39)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(
@@ -445,15 +467,25 @@ private struct MarkdownBlockView: View {
     }
 
     private func imagePlaceholder(alt: String) -> some View {
-        ContentUnavailableView(
-            "reader.image_error_title",
-            systemImage: "photo.badge.exclamationmark",
-            description: Text(
-                alt.isEmpty ? L10n.string("reader.image_error_description") : alt
-            )
-        )
-        .frame(maxWidth: .infinity, minHeight: 160)
+        // The caption below already carries the alt text, so the placeholder
+        // only says what went wrong, in the document's own type.
+        VStack(spacing: 8) {
+            Image(systemName: "photo.badge.exclamationmark")
+                .font(.system(size: bodySize * 1.5, weight: .light))
+                .symbolRenderingMode(.hierarchical)
+            Text("reader.image_error_title")
+                .font(documentFont(size: bodySize * 0.9, weight: .medium))
+            if alt.isEmpty {
+                Text("reader.image_error_description")
+                    .font(documentFont(size: bodySize * 0.82))
+            }
+        }
+        .foregroundStyle(theme.textSecondary)
+        .multilineTextAlignment(.center)
+        .padding(.horizontal, 16)
+        .frame(maxWidth: .infinity, minHeight: 112)
         .background(theme.codeFill, in: .rect(cornerRadius: 8))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(theme.codeBorder))
     }
 
     // Remote and document-relative images both load through the shared cache;
