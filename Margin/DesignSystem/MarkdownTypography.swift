@@ -3,6 +3,11 @@ import SwiftUI
 import UIKit
 
 enum MarkdownTypography {
+    static func columnPadding(compact: Bool) -> EdgeInsets {
+        let horizontal: CGFloat = compact ? 20 : 32
+        return EdgeInsets(top: compact ? 24 : 32, leading: horizontal, bottom: 0, trailing: horizontal)
+    }
+
     private struct InlineFontCacheKey: Hashable {
         let typeface: DocumentTypeface
         let size: Double

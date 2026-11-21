@@ -26,21 +26,19 @@ enum ReaderAppearance: String, CaseIterable, Identifiable {
 
 enum WorkspaceMode: String, CaseIterable, Identifiable {
     case read
-    case edit
+    case live
+    case source
 
     var id: Self { self }
+    var isEditing: Bool { self != .read }
 
     var title: LocalizedStringKey {
         switch self {
         case .read: "workspace.mode.read"
-        case .edit: "workspace.mode.edit"
+        case .live: "workspace.mode.live"
+        case .source: "workspace.mode.source"
         }
     }
 
-    var systemImage: String {
-        switch self {
-        case .read: "doc.richtext"
-        case .edit: "pencil.line"
-        }
-    }
+    var accessibilityTitle: LocalizedStringKey { self == .live ? "editor.live_formatting" : title }
 }

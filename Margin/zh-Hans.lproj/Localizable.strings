@@ -22,7 +22,9 @@
 "appearance.light" = "浅色";
 "appearance.dark" = "深色";
 "workspace.mode.read" = "阅读";
-"workspace.mode.edit" = "编辑";
+"workspace.mode.label" = "文档模式";
+"workspace.mode.live" = "实时";
+"workspace.mode.source" = "源码";
 
 "settings.section.theme" = "主题";
 "settings.document_theme" = "文稿主题";
@@ -37,6 +39,8 @@
 "font.sans" = "无衬线";
 "settings.reset_typography" = "恢复默认排版";
 "settings.title" = "阅读设置";
+"settings.app_language" = "App 语言";
+"settings.app_language_hint" = "前往“设置 → App → Margin → 语言”更改界面语言。";
 
 "theme.picker.title" = "选取主题";
 "theme.picker.hint" = "选择此文稿主题";
@@ -101,6 +105,7 @@
 "editor.placeholder.code" = "代码";
 "editor.placeholder.math" = "公式";
 "editor.accessibility_label" = "Markdown 编辑器";
+"editor.live_formatting" = "实时排版";
 
 "outline.empty_title" = "没有目录";
 "outline.empty_description" = "添加 Markdown 标题后，它们会出现在这里。";

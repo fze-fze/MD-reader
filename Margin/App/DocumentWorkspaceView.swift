@@ -76,16 +76,32 @@ struct DocumentWorkspaceView: View {
             .allowsHitTesting(mode == .read)
             .accessibilityHidden(mode != .read)
 
-            if mode == .edit {
+            if mode == .live {
+                LiveMarkdownEditorView(
+                    text: $text,
+                    isFocused: editorFocus(in: .live),
+                    initialLocation: editorStartLocation,
+                    position: readingPosition,
+                    textScale: textScale,
+                    baseURL: effectiveFileURL?.deletingLastPathComponent(),
+                    readerTheme: readerTheme,
+                    bodyFont: bodyFont,
+                    headingFont: headingFont,
+                    isCurrentEditor: { mode == .live }
+                )
+                .transition(.opacity)
+            } else if mode == .source {
                 MarkdownEditorView(
                     text: $text,
                     initialLocation: editorStartLocation,
                     position: readingPosition,
                     textScale: textScale,
-                    isFocused: $isEditorFocused,
+                    isFocused: editorFocus(in: .source),
                     findTrigger: editorFindTrigger,
+                    liveFormatting: false,
                     readerTheme: readerTheme,
-                    bodyFont: bodyFont
+                    bodyFont: bodyFont,
+                    isCurrentEditor: { mode == .source }
                 )
                     .transition(.opacity)
             }
@@ -95,12 +111,11 @@ struct DocumentWorkspaceView: View {
         .background(InteractivePopGestureRestorer())
         .safeAreaInset(edge: .top, spacing: 0) {
             PagesDocumentNavigationBar(
-                mode: mode,
+                mode: Binding(get: { mode }, set: selectMode),
                 documentName: displayName,
                 theme: theme,
                 onDismiss: dismissWorkspace,
                 onSearch: presentSearch,
-                onToggleMode: toggleWorkspaceMode,
                 onSettings: presentSettings,
                 onOutline: presentOutline,
                 onDocumentInfo: presentDocumentInfo,
@@ -140,7 +155,7 @@ struct DocumentWorkspaceView: View {
         .sheet(item: $presentedSheet) { sheet in
             sheetView(sheet)
         }
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: mode)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: mode.isEditing)
         .animation(
             reduceMotion ? nil : .easeInOut(duration: 0.16),
             value: isSearchPresented
@@ -153,12 +168,23 @@ struct DocumentWorkspaceView: View {
         dismiss()
     }
 
-    private func toggleWorkspaceMode() {
-        if mode == .read {
-            beginEditing()
-        } else {
+    private func selectMode(_ newMode: WorkspaceMode) {
+        guard newMode != mode else { return }
+        if newMode == .read {
             finishEditing()
+        } else if mode == .read {
+            beginEditing(in: newMode)
+        } else {
+            editorStartLocation = readingPosition.editorCaretLocation
+            editorFindTrigger = 0
+            mode = newMode
         }
+    }
+
+    private func editorFocus(in editorMode: WorkspaceMode) -> Binding<Bool> {
+        Binding(get: { mode == editorMode && isEditorFocused }, set: { focused in
+            if mode == editorMode { isEditorFocused = focused }
+        })
     }
 
     private func presentSettings() {
@@ -177,7 +203,7 @@ struct DocumentWorkspaceView: View {
         requestedDocumentAction = action
     }
 
-    private func beginEditing() {
+    private func beginEditing(in mode: WorkspaceMode) {
         dismissSearch()
         readerSource = text
         // Open the editor on the passage being read, not at the top.
@@ -185,16 +211,19 @@ struct DocumentWorkspaceView: View {
             SourceLines.utf16Offset(ofLine: $0, in: text)
         } ?? 0
         readingPosition.editorCaretLocation = editorStartLocation
-        mode = .edit
+        editorFindTrigger = 0
+        self.mode = mode
         Task { @MainActor in
             await Task.yield()
-            isEditorFocused = true
+            if self.mode.isEditing {
+                isEditorFocused = true
+            }
         }
     }
 
     private func finishEditing() {
         isEditorFocused = false
-        if mode == .edit {
+        if mode.isEditing {
             // And come back to the reader where the caret was left.
             readingPosition.pendingLine = SourceLines.lineIndex(
                 atUTF16Offset: readingPosition.editorCaretLocation,
@@ -209,7 +238,8 @@ struct DocumentWorkspaceView: View {
     // In reading mode the magnifier opens the document search bar; in edit
     // mode it presents UITextView's system find panel instead.
     private func presentSearch() {
-        if mode == .edit {
+        if mode.isEditing {
+            if mode == .live { selectMode(.source) }
             editorFindTrigger &+= 1
         } else {
             searchSession.readingPosition = readingPosition

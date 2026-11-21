@@ -1,17 +1,32 @@
 import SwiftUI
 
 struct MarkdownEditorView: View {
+    struct AccessoryRequest: Equatable {
+        let id = UUID()
+        let action: MarkdownEditAction
+    }
+
     @Binding var text: String
     let position: ReadingPosition
     let textScale: Double
     @Binding var isFocused: Bool
     let findTrigger: Int
+    let liveFormatting: Bool
     let readerTheme: ReaderTheme
     let bodyFont: ReaderFontChoice
+    let headingFont: ReaderFontChoice
+    let embedded: Bool
+    let sourceOffset: Int
+    let accessoryRequest: AccessoryRequest?
+    let isCurrentEditor: () -> Bool
+    let regionID: UUID?
+    let regionSelection: Binding<NSRange>?
+    let isComposing: Binding<Bool>?
 
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @ScaledMetric(relativeTo: .body) private var bodySize = 16.0
-    @State private var selectedRange: NSRange
+    @State private var sourceSelection: NSRange
 
     // The editor owns a synchronous mirror of the document text. Feeding the
     // UITextView from the DocumentGroup binding directly lets a stale binding
@@ -19,7 +34,27 @@ struct MarkdownEditorView: View {
     // caret — and the scroll position — to the end of the document. While the
     // editor is on screen this mirror is the source of truth and only pushes
     // outward; the editor is recreated from the binding on each edit session.
-    @State private var editorText: String
+    @State private var sourceText: String
+
+    private var editorText: String {
+        get { embedded ? text : sourceText }
+        nonmutating set {
+            if !embedded { sourceText = newValue }
+            if text != newValue { text = newValue }
+        }
+    }
+
+    private var selectedRange: NSRange {
+        get { regionSelection?.wrappedValue ?? sourceSelection }
+        nonmutating set {
+            if let regionSelection {
+                regionSelection.wrappedValue = newValue
+            } else {
+                sourceSelection = newValue
+            }
+            if isCurrentEditor() { position.editorCaretLocation = sourceOffset + newValue.location }
+        }
+    }
 
     init(
         text: Binding<String>,
@@ -28,47 +63,70 @@ struct MarkdownEditorView: View {
         textScale: Double,
         isFocused: Binding<Bool>,
         findTrigger: Int,
+        liveFormatting: Bool,
         readerTheme: ReaderTheme,
-        bodyFont: ReaderFontChoice = .themeDefault
+        bodyFont: ReaderFontChoice = .themeDefault,
+        headingFont: ReaderFontChoice = .themeDefault,
+        embedded: Bool = false,
+        sourceOffset: Int = 0,
+        accessoryRequest: AccessoryRequest? = nil,
+        isCurrentEditor: @escaping () -> Bool = { true },
+        regionID: UUID? = nil,
+        regionSelection: Binding<NSRange>? = nil,
+        isComposing: Binding<Bool>? = nil
     ) {
         _text = text
-        _editorText = State(initialValue: text.wrappedValue)
-        _selectedRange = State(initialValue: NSRange(location: initialLocation, length: 0))
+        _sourceText = State(initialValue: text.wrappedValue)
+        _sourceSelection = State(initialValue: NSRange(location: initialLocation, length: 0))
         self.position = position
         self.textScale = textScale
         _isFocused = isFocused
         self.findTrigger = findTrigger
+        self.liveFormatting = liveFormatting
         self.readerTheme = readerTheme
         self.bodyFont = bodyFont
+        self.headingFont = headingFont
+        self.embedded = embedded
+        self.sourceOffset = sourceOffset
+        self.accessoryRequest = accessoryRequest
+        self.isCurrentEditor = isCurrentEditor
+        self.regionID = regionID
+        self.regionSelection = regionSelection
+        self.isComposing = isComposing
     }
 
     private var theme: MarkdownTheme {
-        MarkdownTheme(readerTheme: readerTheme, colorScheme: colorScheme, bodyFont: bodyFont)
+        MarkdownTheme(
+            readerTheme: readerTheme,
+            colorScheme: colorScheme,
+            bodyFont: bodyFont,
+            headingFont: headingFont
+        )
     }
 
     var body: some View {
+        let padding = MarkdownTypography.columnPadding(compact: horizontalSizeClass == .compact)
         NativeMarkdownTextView(
-            text: $editorText,
-            selectedRange: $selectedRange,
+            text: Binding(get: { editorText }, set: { editorText = $0 }),
+            selectedRange: Binding(get: { selectedRange }, set: { selectedRange = $0 }),
             isFocused: $isFocused,
             findTrigger: findTrigger,
+            liveFormatting: liveFormatting && LiveMarkdownLine.canFormatDraft(editorText),
             theme: theme,
             readerTheme: readerTheme,
-            bodySize: bodySize * textScale
+            bodySize: bodySize * textScale,
+            embedded: embedded,
+            regionID: regionID,
+            isComposing: isComposing
         )
-        .frame(maxWidth: 820)
+        .frame(maxWidth: theme.contentMaxWidth + padding.leading + padding.trailing)
         .frame(maxWidth: .infinity)
         .background(theme.canvas)
-        .onChange(of: editorText) { _, updatedText in
-            if text != updatedText {
-                text = updatedText
-            }
-        }
-        .onChange(of: selectedRange) { _, range in
-            position.editorCaretLocation = range.location
+        .onChange(of: accessoryRequest) { _, request in
+            if let request { apply(request.action) }
         }
         .safeAreaBar(edge: .bottom) {
-            if isFocused {
+            if isFocused && !embedded {
                 MarkdownAccessoryBar(readerTheme: readerTheme) { action in
                     apply(action)
                 }

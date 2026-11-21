@@ -1,12 +1,11 @@
 import SwiftUI
 
 struct PagesDocumentNavigationBar: View {
-    let mode: WorkspaceMode
+    @Binding var mode: WorkspaceMode
     let documentName: String
     let theme: MarkdownTheme
     let onDismiss: () -> Void
     let onSearch: () -> Void
-    let onToggleMode: () -> Void
     let onSettings: () -> Void
     let onOutline: () -> Void
     let onDocumentInfo: () -> Void
@@ -14,9 +13,11 @@ struct PagesDocumentNavigationBar: View {
     let canMove: Bool
     let canRename: Bool
 
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
     var body: some View {
         GlassEffectContainer(spacing: 12) {
-            HStack(spacing: 12) {
+            HStack(spacing: 8) {
                 Button(action: onDismiss) {
                     Label("workspace.back", systemImage: "chevron.backward")
                         .labelStyle(.iconOnly)
@@ -29,15 +30,22 @@ struct PagesDocumentNavigationBar: View {
                     in: .circle
                 )
 
-                Spacer(minLength: 0)
+                Group {
+                    if dynamicTypeSize.isAccessibilitySize {
+                        modePicker(withFullLabels: true)
+                            .pickerStyle(.menu)
+                    } else {
+                        modePicker(withFullLabels: false)
+                            .pickerStyle(.segmented)
+                            .frame(maxWidth: 280)
+                    }
+                }
+                .frame(maxWidth: .infinity)
 
                 PagesWorkspaceToolbar(
-                    mode: mode,
                     documentName: documentName,
-                    accent: theme.accent,
                     glassTint: theme.navigationGlassTint,
                     onSearch: onSearch,
-                    onToggleMode: onToggleMode,
                     onSettings: onSettings,
                     onOutline: onOutline,
                     onDocumentInfo: onDocumentInfo,
@@ -68,5 +76,17 @@ struct PagesDocumentNavigationBar: View {
             .ignoresSafeArea(edges: .top)
             .allowsHitTesting(false)
         }
+    }
+
+    private func modePicker(withFullLabels: Bool) -> some View {
+        Picker("workspace.mode.label", selection: $mode) {
+            ForEach(WorkspaceMode.allCases) { mode in
+                Text(withFullLabels ? mode.accessibilityTitle : mode.title)
+                    .accessibilityLabel(Text(mode.accessibilityTitle))
+                    .tag(mode)
+            }
+        }
+        .tint(theme.accent)
+        .frame(minHeight: 44)
     }
 }
