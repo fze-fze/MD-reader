@@ -51,6 +51,14 @@ Parsing and search indexing run off the main actor via `Task.detached` in `Markd
 
 Scrolling re-evaluates every visible block's body, so anything expensive there is memoized: `InlineMarkdownStyler` (parsed+styled `AttributedString`), `InlineMathSegmenter` (lock-guarded — also reached off-main by search indexing), `MathRenderer` (formula images), and `MarkdownTypography.inlineFonts`. All are bounded and dropped on `applicationDidReceiveMemoryWarning`. Two rules follow: never call `MarkdownBlock.searchableFragments` from a view body (it re-parses markdown — `fragmentOccurrenceOffsets` computes prefix sums once per block and only while searching), and load images through `CachedAsyncImage`/`ReaderImageLoader` (both remote and document-relative) rather than decoding inline.
 
+### Line endings and mode switches
+
+A source line ends at `\n`, `\r\n` or `\r` — CRLF is **one** line. `MarkdownParser`, `SourceLines`, `MarkdownTaskToggler` and `DocumentStatistics` must agree on this, or block IDs drift from the lines that task toggling and annotations rewrite.
+
+`ReadingPosition` (owned by `DocumentWorkspaceView`) carries the place across reader ↔ editor: the reader reports its visible block IDs, the editor opens with its caret on that source line (`SourceLines.utf16Offset(ofLine:in:)`), and leaving the editor scrolls the reader back to the caret's line. The editor's `UITextView` is deliberately **TextKit 1** — TextKit 2 estimates unlaid-out heights, and after a jump into a long document taps resolve sections away from what is drawn.
+
+`MarkdownLineEditing` holds the editor's pure line edits (Return continuing a list/quote, accessory-bar prefix toggling) so they are testable without a text view.
+
 ### Math (LaTeX)
 
 Delimiters are `$` only, by design: display math is a standalone `$$…$$` line or a multi-line `$$` fence (`MarkdownBlock.Kind.math`; an unterminated opener stays a paragraph), inline math is `$…$` split out by `InlineMathSegmenter`. `\(…\)`, `\[…\]`, and mid-sentence `$$` are intentionally plain text. Inline code spans and `\$` escapes win over `$`, and a `$` span needs non-space-adjacent delimiters with no digit after the closer (so “$5 和 $10” stays text).
@@ -104,6 +112,8 @@ The document menu's **Export** submenu offers Markdown / PDF / HTML; each writes
 ## Tests
 
 `MarginTests/MarkdownParserTests.swift` — swift-testing (`import Testing`, `@Test`, `#expect`), one file that currently covers the parser, statistics, search index, typography cascade, quick action, task toggler, share, print renderer, and mermaid detection/bundling/export. Tests that touch `DocumentSharePresenter` etc. need `@MainActor`.
+
+`MarkdownStructureTests.swift` covers block structure from real-world documents (CRLF, nested lists, ragged tables, fences, front matter vs. divider); `MarkdownLineEditingTests.swift` covers the editor's line edits and line/offset conversion.
 
 ## Conventions
 

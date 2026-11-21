@@ -96,7 +96,12 @@ struct MarkdownReaderView: View {
         position.pendingLine = nil
         guard let target = blocks.last(where: { $0.id <= line })?.id,
               !position.visibleBlockIDs.contains(target) else { return }
-        proxy.scrollTo(target, anchor: .top)
+        // Animated like the outline jump: a lazy stack only knows estimated
+        // offsets for blocks it has not built, and settles on the real one
+        // as the animation brings them in.
+        withAnimation(.snappy) {
+            proxy.scrollTo(target, anchor: .top)
+        }
     }
 
     private func scrollToCurrentMatch(using proxy: ScrollViewProxy) {

@@ -15,7 +15,11 @@ struct NativeMarkdownTextView: UIViewRepresentable {
     }
 
     func makeUIView(context: Context) -> UITextView {
-        let view = UITextView()
+        // TextKit 1 on purpose. TextKit 2 estimates the height of text it has
+        // not laid out, and after a jump into the middle of a long document
+        // it draws one passage while resolving taps against another — the
+        // caret lands sections away from where the user touched.
+        let view = UITextView(usingTextLayoutManager: false)
         view.delegate = context.coordinator
         view.backgroundColor = UIColor(theme.canvas)
         view.textColor = UIColor(theme.textPrimary)
@@ -103,11 +107,15 @@ struct NativeMarkdownTextView: UIViewRepresentable {
 
     // Puts the line holding the caret at the top of the editor once the view
     // has a size, so an editor opened part-way through a document shows the
-    // passage the reader was showing.
+    // passage the reader was showing. Everything above the caret is laid out
+    // first, so the offset is measured rather than estimated.
     private func scrollToSelection(in view: UITextView) {
         Task { @MainActor in
             await Task.yield()
             view.layoutIfNeeded()
+            view.layoutManager.ensureLayout(
+                forCharacterRange: NSRange(location: 0, length: view.selectedRange.location)
+            )
             guard let caretPosition = view.selectedTextRange?.start else { return }
             let caret = view.caretRect(for: caretPosition)
             guard !caret.isNull, !caret.isInfinite else { return }

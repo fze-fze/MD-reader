@@ -6,6 +6,7 @@ struct DocumentSearchBar: View {
     let onDismiss: () -> Void
 
     @FocusState private var isFocused: Bool
+    @State private var selection: TextSelection?
 
     var body: some View {
         HStack(spacing: 6) {
@@ -13,7 +14,7 @@ struct DocumentSearchBar: View {
                 .foregroundStyle(theme.textSecondary)
                 .accessibilityHidden(true)
 
-            TextField("workspace.search_prompt", text: $session.query)
+            TextField("workspace.search_prompt", text: $session.query, selection: $selection)
                 .focused($isFocused)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
@@ -63,6 +64,13 @@ struct DocumentSearchBar: View {
         .task {
             await Task.yield()
             isFocused = true
+        }
+        .onChange(of: isFocused) { _, focused in
+            // The previous query is kept, selected, so typing replaces it
+            // instead of appending to it. A selection only sticks once the
+            // field is the first responder.
+            guard focused, !session.query.isEmpty else { return }
+            selection = TextSelection(range: session.query.startIndex..<session.query.endIndex)
         }
         .task(id: session.request) {
             await session.performSearch()
