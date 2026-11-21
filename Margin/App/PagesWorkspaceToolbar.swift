@@ -56,12 +56,10 @@ struct PagesWorkspaceToolbar: View {
     // shows a (potentially stale) title.
     private var documentMenu: some View {
         Menu {
-            if mode == .edit {
-                Section {
+            Section(documentName) {
+                if mode == .edit {
                     Toggle("editor.live_formatting", isOn: $liveFormatting)
                 }
-            }
-            Section(documentName) {
                 Button("workspace.outline", systemImage: "list.bullet.indent", action: onOutline)
                 Button("workspace.document_info", systemImage: "info.circle", action: onDocumentInfo)
                 Button("workspace.reader_settings", systemImage: "paintbrush", action: onSettings)

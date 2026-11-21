@@ -265,21 +265,27 @@ final class LiveMarkdownStyler: NSObject, NSTextStorageDelegate, NSLayoutManager
         }
         if let marker = model.marker {
             let first = content.location + marker.range.location
-            let character = Array(marker.symbol.utf16)
-            let fallback = CTFontCreateForString(palette.markerFont as CTFont, marker.symbol as CFString, CFRange(location: 0, length: 1))
-            let font = fallback as UIFont
-            var glyph: CGGlyph = 0
-            if CTFontGetGlyphsForCharacters(fallback, character, &glyph, 1) {
+            let character = marker.symbol.utf16.first ?? 0
+            // This font must contain both the original ASCII marker and the
+            // symbol; otherwise TextKit can generate the run in another font.
+            let font = marker.symbol == "•" ? palette.markerFont : palette.checkboxFont
+            if Self.glyph(for: character, in: font) != nil {
                 storage.addAttributes([
                     .font: font,
                     .foregroundColor: UIColor(style.theme.accent),
-                    Self.glyphKey: Int(glyph)
+                    Self.glyphKey: Int(character)
                 ], range: NSRange(location: first, length: 1))
                 if marker.range.length > 1 {
                     storage.addAttribute(Self.glyphKey, value: 0, range: NSRange(location: first + 1, length: marker.range.length - 1))
                 }
             }
         }
+    }
+
+    private static func glyph(for character: UInt16, in font: UIFont) -> CGGlyph? {
+        var character = character
+        var glyph: CGGlyph = 0
+        return CTFontGetGlyphsForCharacters(font as CTFont, &character, &glyph, 1) ? glyph : nil
     }
 
     func layoutManager(
@@ -307,8 +313,8 @@ final class LiveMarkdownStyler: NSObject, NSTextStorageDelegate, NSLayoutManager
             }
             if glyphOverride == 0 {
                 renderedProperties[index].insert(.null)
-            } else {
-                renderedGlyphs[index] = CGGlyph(glyphOverride)
+            } else if let replacement = Self.glyph(for: UInt16(glyphOverride), in: font) {
+                renderedGlyphs[index] = replacement
             }
         }
         guard !renderedProperties.isEmpty else { return 0 }
@@ -327,6 +333,7 @@ final class LiveMarkdownStyler: NSObject, NSTextStorageDelegate, NSLayoutManager
         let base: [NSAttributedString.Key: Any]
         let monospace: UIFont
         let markerFont: UIFont
+        let checkboxFont: UIFont
 
         init(_ style: Style) {
             self.style = style
@@ -339,6 +346,7 @@ final class LiveMarkdownStyler: NSObject, NSTextStorageDelegate, NSLayoutManager
             ]
             monospace = UIFont.monospacedSystemFont(ofSize: style.bodySize, weight: .regular)
             markerFont = UIFont.systemFont(ofSize: style.bodySize)
+            checkboxFont = UIFont(name: "Menlo-Regular", size: style.bodySize) ?? monospace
         }
     }
 }

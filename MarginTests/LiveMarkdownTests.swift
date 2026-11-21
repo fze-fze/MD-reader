@@ -1,3 +1,4 @@
+import CoreText
 import SwiftUI
 import Testing
 import UIKit
@@ -39,7 +40,7 @@ struct LiveMarkdownTests {
         let source = "# Head\r\n**bold**\r\n"
         let (view, styler) = makeEditor(source)
         let heading = NSRange(location: 0, length: 0)
-        let bold = NSRange(location: 9, length: 4)
+        let bold = NSRange(location: 10, length: 4)
         #expect(!isHidden(in: view, at: 0))
         #expect(isHidden(in: view, at: 8))
 
@@ -62,6 +63,28 @@ struct LiveMarkdownTests {
         await refresh(styler)
         #expect(!isHidden(in: view, at: 0))
         #expect(isHidden(in: view, at: 8))
+    }
+
+    @Test @MainActor func checkboxesUseGlyphsFromTheTextKitFont() {
+        let source = "Tasks\n- [ ] First\n- [x] Second"
+        let (view, styler) = makeEditor(source)
+        withExtendedLifetime(styler) {
+            for (location, symbol) in [(6, "☐"), (18, "☑")] {
+                let range = NSRange(location: location, length: 1)
+                let layout = view.layoutManager
+                layout.ensureGlyphs(forCharacterRange: range)
+                guard let font = view.textStorage.attribute(.font, at: location, effectiveRange: nil) as? UIFont else {
+                    Issue.record("Missing editor font")
+                    return
+                }
+                var character = symbol.utf16.first ?? 0
+                var expected: CGGlyph = 0
+                #expect(CTFontGetGlyphsForCharacters(font as CTFont, &character, &expected, 1))
+                #expect(layout.glyph(at: layout.glyphIndexForCharacter(at: location)) == expected)
+                #expect(isHidden(in: view, at: location + 1))
+            }
+            #expect(view.text == source)
+        }
     }
 
     @Test @MainActor func editingAnOpeningFenceRestylesFollowingLines() async {
