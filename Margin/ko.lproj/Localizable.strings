@@ -98,6 +98,7 @@
 "editor.placeholder.code" = "코드";
 "editor.placeholder.math" = "수식";
 "editor.accessibility_label" = "Markdown 편집기";
+"editor.live_formatting" = "실시간 서식 표시";
 
 "outline.empty_title" = "개요 없음";
 "outline.empty_description" = "Markdown 제목을 추가하면 여기에 표시됩니다.";

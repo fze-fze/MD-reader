@@ -98,6 +98,7 @@
 "editor.placeholder.code" = "コード";
 "editor.placeholder.math" = "数式";
 "editor.accessibility_label" = "Markdownエディタ";
+"editor.live_formatting" = "リアルタイム書式表示";
 
 "outline.empty_title" = "アウトラインはありません";
 "outline.empty_description" = "Markdownの見出しを追加すると、ここに表示されます。";

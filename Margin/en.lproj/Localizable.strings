@@ -11,7 +11,6 @@
 "workspace.back" = "Back to Documents";
 "workspace.search" = "Search";
 "workspace.edit" = "Edit";
-"editor.live_formatting" = "Live Formatting";
 "workspace.more" = "More";
 "workspace.outline" = "Outline";
 "workspace.reader_settings" = "Reading Settings";
@@ -99,6 +98,7 @@
 "editor.placeholder.code" = "code";
 "editor.placeholder.math" = "formula";
 "editor.accessibility_label" = "Markdown editor";
+"editor.live_formatting" = "Live Formatting";
 
 "outline.empty_title" = "No Outline";
 "outline.empty_description" = "Add Markdown headings and they will appear here.";

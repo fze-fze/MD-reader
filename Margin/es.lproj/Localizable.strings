@@ -98,6 +98,7 @@
 "editor.placeholder.code" = "código";
 "editor.placeholder.math" = "fórmula";
 "editor.accessibility_label" = "Editor Markdown";
+"editor.live_formatting" = "Formato en tiempo real";
 
 "outline.empty_title" = "Sin esquema";
 "outline.empty_description" = "Añade encabezados Markdown para que aparezcan aquí.";

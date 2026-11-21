@@ -98,6 +98,7 @@
 "editor.placeholder.code" = "程式碼";
 "editor.placeholder.math" = "公式";
 "editor.accessibility_label" = "Markdown 編輯器";
+"editor.live_formatting" = "即時排版";
 
 "outline.empty_title" = "沒有大綱";
 "outline.empty_description" = "新增 Markdown 標題後，就會在這裡顯示。";

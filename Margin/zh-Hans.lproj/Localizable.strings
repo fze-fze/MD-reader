@@ -11,7 +11,6 @@
 "workspace.back" = "返回文稿列表";
 "workspace.search" = "搜索";
 "workspace.edit" = "编辑";
-"editor.live_formatting" = "实时排版";
 "workspace.more" = "更多";
 "workspace.outline" = "目录";
 "workspace.reader_settings" = "阅读设置";
@@ -99,6 +98,7 @@
 "editor.placeholder.code" = "代码";
 "editor.placeholder.math" = "公式";
 "editor.accessibility_label" = "Markdown 编辑器";
+"editor.live_formatting" = "实时排版";
 
 "outline.empty_title" = "没有目录";
 "outline.empty_description" = "添加 Markdown 标题后，它们会出现在这里。";
