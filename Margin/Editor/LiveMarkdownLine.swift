@@ -30,6 +30,20 @@ nonisolated struct LiveMarkdownLine {
     private static let quote = try! NSRegularExpression(pattern: #"^ {0,3}>[ \t]?"#)
     private static let bullet = try! NSRegularExpression(pattern: #"^([ \t]*)([-+*])(?:[ \t]+\[([ xX])\](?=[ \t]|$)|(?=[ \t]))"#)
 
+    static func canFormatDraft(_ source: String) -> Bool {
+        // The Reader resolves multiline syntax when the block is inactive.
+        // While editing, keep the draft literal if line-by-line parsing
+        // could hide operators or punctuation inside a delimited span.
+        guard source.utf8.count <= 8_192 else { return false }
+        if source.utf8.contains(96), source.contains(where: \.isNewline) { return false }
+        if source.utf8.contains(36) {
+            return !source.split(whereSeparator: \.isNewline).contains {
+                $0.drop(while: { $0 == " " || $0 == "\t" }).hasPrefix("$$")
+            }
+        }
+        return true
+    }
+
     init(source: String, code: Bool = false, fence: Bool = false) {
         if code {
             block = .code(fence: fence)

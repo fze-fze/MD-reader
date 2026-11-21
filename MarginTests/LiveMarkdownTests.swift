@@ -5,6 +5,14 @@ import UIKit
 @testable import Margin
 
 struct LiveMarkdownTests {
+    @Test func draftWithDisplayMathOrCrossLineCodeStaysLiteral() {
+        #expect(!LiveMarkdownLine.canFormatDraft("$$a*b*c$$"))
+        #expect(!LiveMarkdownLine.canFormatDraft("  $$\r\na*b*c\r\n$$"))
+        #expect(!LiveMarkdownLine.canFormatDraft("`first\n**literal**`"))
+        #expect(LiveMarkdownLine.canFormatDraft("One `code` span"))
+        #expect(LiveMarkdownLine.canFormatDraft("- **Emphasis**\n- Math $a*b*c$"))
+    }
+
     @Test func headingAndInlineStylesUseOriginalUTF16Offsets() {
         let source = "## 你好🙂 **bold** and *斜体* ##"
         let line = LiveMarkdownLine(source: source)

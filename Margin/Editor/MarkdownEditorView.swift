@@ -100,7 +100,7 @@ struct MarkdownEditorView: View {
             selectedRange: Binding(get: { selectedRange }, set: { selectedRange = $0 }),
             isFocused: $isFocused,
             findTrigger: findTrigger,
-            liveFormatting: liveFormatting,
+            liveFormatting: liveFormatting && LiveMarkdownLine.canFormatDraft(editorText),
             theme: theme,
             readerTheme: readerTheme,
             bodySize: bodySize * textScale,
