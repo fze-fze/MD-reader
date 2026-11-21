@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct ReaderSettingsView: View {
     @Binding private var appearance: ReaderAppearance
@@ -63,6 +64,16 @@ struct ReaderSettingsView: View {
                         commitTextScale()
                     }
                     .disabled(draftTextScale == 1)
+                }
+
+                if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
+                    Section {
+                        Link(destination: settingsURL) {
+                            Label("settings.app_language", systemImage: "globe")
+                        }
+                    } footer: {
+                        Text("settings.app_language_hint")
+                    }
                 }
             }
             .tint(theme.accent)
