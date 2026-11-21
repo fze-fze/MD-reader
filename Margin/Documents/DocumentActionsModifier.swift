@@ -8,6 +8,8 @@ struct DocumentActionsModifier: ViewModifier {
     let onRenamed: (URL) -> Void
 
     @AppStorage("readerTheme") private var readerTheme = ReaderTheme.claude
+    @AppStorage("readerBodyFont") private var bodyFont = ReaderFontChoice.themeDefault
+    @AppStorage("readerHeadingFont") private var headingFont = ReaderFontChoice.themeDefault
 
     @State private var isCopyPresented = false
     @State private var isMovePresented = false
@@ -84,6 +86,8 @@ struct DocumentActionsModifier: ViewModifier {
                     text: text,
                     title: displayName,
                     theme: readerTheme,
+                    bodyFont: bodyFont,
+                    headingFont: headingFont,
                     baseURL: fileURL?.deletingLastPathComponent()
                 )
             }
@@ -106,6 +110,8 @@ struct DocumentActionsModifier: ViewModifier {
                         text: text,
                         title: displayName,
                         theme: readerTheme,
+                        bodyFont: bodyFont,
+                        headingFont: headingFont,
                         baseURL: fileURL?.deletingLastPathComponent()
                     )
                 case .html:
@@ -113,6 +119,8 @@ struct DocumentActionsModifier: ViewModifier {
                         source: text,
                         title: displayName,
                         theme: readerTheme,
+                        bodyFont: bodyFont,
+                        headingFont: headingFont,
                         baseURL: fileURL?.deletingLastPathComponent()
                     )
                     let exported = try DocumentSharePresenter.makeTemporaryFile(

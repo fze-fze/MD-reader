@@ -42,7 +42,7 @@ struct NativeMarkdownTextView: UIViewRepresentable {
             scrollToSelection(in: view)
         }
         context.coordinator.recordTypography(
-            readerTheme: readerTheme,
+            typeface: theme.bodyTypeface,
             bodySize: bodySize,
             textColor: UIColor(theme.textPrimary)
         )
@@ -71,7 +71,7 @@ struct NativeMarkdownTextView: UIViewRepresentable {
             view.tintColor = UIColor(theme.accent)
         }
         let typographyChanged = context.coordinator.typographyChanged(
-            readerTheme: readerTheme,
+            typeface: theme.bodyTypeface,
             bodySize: bodySize,
             textColor: UIColor(theme.textPrimary)
         )
@@ -80,7 +80,7 @@ struct NativeMarkdownTextView: UIViewRepresentable {
             view.font = documentFont
             applyTypography(to: view)
             context.coordinator.recordTypography(
-                readerTheme: readerTheme,
+                typeface: theme.bodyTypeface,
                 bodySize: bodySize,
                 textColor: UIColor(theme.textPrimary)
             )
@@ -133,7 +133,7 @@ struct NativeMarkdownTextView: UIViewRepresentable {
     }
 
     private var documentFont: UIFont {
-        MarkdownTypography.documentUIFont(theme: readerTheme, size: bodySize)
+        MarkdownTypography.documentUIFont(typeface: theme.bodyTypeface, size: bodySize)
     }
 
     // Assigning `UITextView.text` moves the caret to the end of the document
@@ -219,7 +219,7 @@ struct NativeMarkdownTextView: UIViewRepresentable {
         // Set when an edit could not be reported yet because an input method
         // was still composing.
         private var hasUnreportedEdit = false
-        private var lastReaderTheme: ReaderTheme?
+        private var lastTypeface: DocumentTypeface?
         private var lastBodySize: Double?
         private var lastTextColor: UIColor?
 
@@ -276,21 +276,21 @@ struct NativeMarkdownTextView: UIViewRepresentable {
         }
 
         func typographyChanged(
-            readerTheme: ReaderTheme,
+            typeface: DocumentTypeface,
             bodySize: Double,
             textColor: UIColor
         ) -> Bool {
-            lastReaderTheme != readerTheme
+            lastTypeface != typeface
                 || lastBodySize != bodySize
                 || lastTextColor?.isEqual(textColor) != true
         }
 
         func recordTypography(
-            readerTheme: ReaderTheme,
+            typeface: DocumentTypeface,
             bodySize: Double,
             textColor: UIColor
         ) {
-            lastReaderTheme = readerTheme
+            lastTypeface = typeface
             lastBodySize = bodySize
             lastTextColor = textColor
         }

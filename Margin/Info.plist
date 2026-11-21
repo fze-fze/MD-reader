@@ -51,6 +51,7 @@
 	<key>UIAppFonts</key>
 	<array>
 		<string>AnthropicSerifWebText-Regular.ttf</string>
+		<string>AnthropicSansWebText-Variable.ttf</string>
 		<string>NotoSerifSC-Variable.ttf</string>
 	</array>
 	<key>LSSupportsOpeningDocumentsInPlace</key>

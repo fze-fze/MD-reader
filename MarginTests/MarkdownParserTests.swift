@@ -483,7 +483,7 @@ struct MarkdownParserTests {
     }
 
     @Test func claudeThemeUsesAnthropicSerifWithBundledCJKSerifFallback() {
-        let font = MarkdownTypography.documentUIFont(theme: .claude, size: 16)
+        let font = MarkdownTypography.documentUIFont(typeface: .anthropicSerif, size: 16)
         let cascade = font.fontDescriptor.object(forKey: .cascadeList)
             as? [UIFontDescriptor]
 
@@ -623,9 +623,9 @@ struct MarkdownParserTests {
         let source = "Plain **bold** with `code` span."
         let claudeLight = MarkdownTheme(readerTheme: .claude, colorScheme: .light)
         let claudeDark = MarkdownTheme(readerTheme: .claude, colorScheme: .dark)
-        let bodyFonts = MarkdownTypography.inlineFonts(theme: .claude, size: 16)
+        let bodyFonts = MarkdownTypography.inlineFonts(typeface: .anthropicSerif, size: 16)
         let headingFonts = MarkdownTypography.inlineFonts(
-            theme: .claude,
+            typeface: .anthropicSerif,
             size: 24,
             weight: .semibold
         )
@@ -655,7 +655,7 @@ struct MarkdownParserTests {
 
     @Test @MainActor func rendersStrongEmphasisAndCombinedEmphasisWithConcreteFonts() {
         let fonts = MarkdownTypography.inlineFonts(
-            theme: .claude,
+            typeface: .anthropicSerif,
             size: 16
         )
         let attributed = InlineMarkdownStyler.attributedString(
@@ -682,14 +682,14 @@ struct MarkdownParserTests {
             fonts: fonts
         )
         let italicUIFont = MarkdownTypography.inlineItalicUIFont(
-            theme: .claude,
+            typeface: .anthropicSerif,
             size: 16,
             weight: .regular
         )
         let italicCascade = italicUIFont.fontDescriptor.object(forKey: .cascadeList)
             as? [UIFontDescriptor]
         let strongUIFont = MarkdownTypography.inlineStrongUIFont(
-            theme: .claude,
+            typeface: .anthropicSerif,
             size: 16,
             weight: .bold
         )

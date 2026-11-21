@@ -7,6 +7,7 @@ struct MarkdownEditorView: View {
     @Binding var isFocused: Bool
     let findTrigger: Int
     let readerTheme: ReaderTheme
+    let bodyFont: ReaderFontChoice
 
     @Environment(\.colorScheme) private var colorScheme
     @ScaledMetric(relativeTo: .body) private var bodySize = 16.0
@@ -27,7 +28,8 @@ struct MarkdownEditorView: View {
         textScale: Double,
         isFocused: Binding<Bool>,
         findTrigger: Int,
-        readerTheme: ReaderTheme
+        readerTheme: ReaderTheme,
+        bodyFont: ReaderFontChoice = .themeDefault
     ) {
         _text = text
         _editorText = State(initialValue: text.wrappedValue)
@@ -37,10 +39,11 @@ struct MarkdownEditorView: View {
         _isFocused = isFocused
         self.findTrigger = findTrigger
         self.readerTheme = readerTheme
+        self.bodyFont = bodyFont
     }
 
     private var theme: MarkdownTheme {
-        MarkdownTheme(readerTheme: readerTheme, colorScheme: colorScheme)
+        MarkdownTheme(readerTheme: readerTheme, colorScheme: colorScheme, bodyFont: bodyFont)
     }
 
     var body: some View {

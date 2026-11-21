@@ -4,7 +4,6 @@ import UIKit
 enum MarkdownPrintRenderer {
     // Light-scheme palette per reader theme; print is always on white.
     private struct Palette {
-        let bodyFont: String
         let text: String
         let headingText: String
         let mutedText: String
@@ -30,7 +29,6 @@ enum MarkdownPrintRenderer {
         switch theme {
         case .claude:
             Palette(
-                bodyFont: "ui-serif, Georgia, \"Songti SC\", serif",
                 text: "#2b2621",
                 headingText: "#1c1815",
                 mutedText: "#72695e",
@@ -56,7 +54,6 @@ enum MarkdownPrintRenderer {
             )
         case .github:
             Palette(
-                bodyFont: "-apple-system, \"Helvetica Neue\", \"PingFang SC\", sans-serif",
                 text: "#333333",
                 headingText: "#24292f",
                 mutedText: "#777777",
@@ -91,13 +88,22 @@ enum MarkdownPrintRenderer {
         source: String,
         title: String,
         theme: ReaderTheme,
+        bodyFont: ReaderFontChoice = .themeDefault,
+        headingFont: ReaderFontChoice = .themeDefault,
         baseURL: URL? = nil
     ) async -> String {
         await MermaidRenderer.shared.prepare(
             sources: diagramSources(in: source),
             style: diagramStyle(for: theme)
         )
-        return html(source: source, title: title, theme: theme, baseURL: baseURL)
+        return html(
+            source: source,
+            title: title,
+            theme: theme,
+            bodyFont: bodyFont,
+            headingFont: headingFont,
+            baseURL: baseURL
+        )
     }
 
     // Print is always on the light palette, whatever the reader is showing.
@@ -116,7 +122,22 @@ enum MarkdownPrintRenderer {
         }
     }
 
-    static func html(source: String, title: String, theme: ReaderTheme, baseURL: URL? = nil) -> String {
+    // Export names system fonts only: the bundled faces are not embedded in
+    // a file that leaves the app, so serif and sans map to the platform's.
+    static func fontStack(_ choice: ReaderFontChoice, theme: ReaderTheme) -> String {
+        choice.isSerif(in: theme)
+            ? "ui-serif, Georgia, \"Songti SC\", serif"
+            : "-apple-system, \"Helvetica Neue\", \"PingFang SC\", sans-serif"
+    }
+
+    static func html(
+        source: String,
+        title: String,
+        theme: ReaderTheme,
+        bodyFont: ReaderFontChoice = .themeDefault,
+        headingFont: ReaderFontChoice = .themeDefault,
+        baseURL: URL? = nil
+    ) -> String {
         let palette = palette(for: theme)
         let body = MarkdownParser.parse(source)
             .map { html(for: $0, baseURL: baseURL, theme: theme, palette: palette) }
@@ -132,8 +153,8 @@ enum MarkdownPrintRenderer {
         /* WebKit drops background fills when printing unless asked not to,
            which would strip inline-code and quote backgrounds from PDFs. */
         * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-        body { color: \(palette.text); font-family: \(palette.bodyFont); font-size: 13pt; line-height: 1.58; margin: 0; overflow-wrap: anywhere; }
-        h1, h2, h3, h4, h5, h6 { color: \(palette.headingText); font-weight: 600; line-height: 1.22; margin: 1.15em 0 .38em; break-after: avoid; }
+        body { color: \(palette.text); font-family: \(fontStack(bodyFont, theme: theme)); font-size: 13pt; line-height: 1.58; margin: 0; overflow-wrap: anywhere; }
+        h1, h2, h3, h4, h5, h6 { color: \(palette.headingText); font-family: \(fontStack(headingFont, theme: theme)); font-weight: 600; line-height: 1.22; margin: 1.15em 0 .38em; break-after: avoid; }
         \(palette.headingSizes)
         h6 { color: \(palette.mutedText); }
         p { margin: .5em 0; }

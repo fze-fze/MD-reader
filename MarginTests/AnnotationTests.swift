@@ -267,7 +267,7 @@ struct AnnotatedBlockTests {
 @MainActor
 struct SelectableInlineTextRenderingTests {
     private func fonts() -> InlineMarkdownUIFonts {
-        MarkdownTypography.inlineUIFonts(theme: .claude, size: 16)
+        MarkdownTypography.inlineUIFonts(typeface: .anthropicSerif, size: 16)
     }
 
     private var theme: MarkdownTheme {

@@ -30,6 +30,11 @@
 "settings.display_mode" = "Display Mode";
 "settings.section.typography" = "Typography";
 "settings.body_size" = "Body Size";
+"settings.body_font" = "Body Font";
+"settings.heading_font" = "Heading Font";
+"font.theme_default" = "Theme Default";
+"font.serif" = "Serif";
+"font.sans" = "Sans";
 "settings.reset_typography" = "Reset Typography";
 "settings.title" = "Reading Settings";
 
