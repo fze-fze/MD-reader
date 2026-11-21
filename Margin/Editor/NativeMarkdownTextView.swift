@@ -15,7 +15,11 @@ struct NativeMarkdownTextView: UIViewRepresentable {
     }
 
     func makeUIView(context: Context) -> UITextView {
-        let view = UITextView()
+        // TextKit 1 on purpose. TextKit 2 estimates the height of text it has
+        // not laid out, and after a jump into the middle of a long document
+        // it draws one passage while resolving taps against another — the
+        // caret lands sections away from where the user touched.
+        let view = UITextView(usingTextLayoutManager: false)
         view.delegate = context.coordinator
         view.backgroundColor = UIColor(theme.canvas)
         view.textColor = UIColor(theme.textPrimary)
@@ -33,6 +37,10 @@ struct NativeMarkdownTextView: UIViewRepresentable {
         view.accessibilityLabel = L10n.string("editor.accessibility_label")
         view.text = text
         applyTypography(to: view)
+        if selectedRange.location > 0, NSMaxRange(selectedRange) <= view.textStorage.length {
+            view.selectedRange = selectedRange
+            scrollToSelection(in: view)
+        }
         context.coordinator.recordTypography(
             readerTheme: readerTheme,
             bodySize: bodySize,
@@ -44,23 +52,31 @@ struct NativeMarkdownTextView: UIViewRepresentable {
     func updateUIView(_ view: UITextView, context: Context) {
         context.coordinator.parent = self
         let hasMarkedText = view.markedTextRange != nil
-        if !hasMarkedText, view.text != text {
+        // This runs after every keystroke. `syncedText` is the string the
+        // text view itself just reported, so the usual comparison is between
+        // two references to the same storage; reading `view.text` here would
+        // copy the whole document each time.
+        if !hasMarkedText, text != context.coordinator.syncedText {
             replaceChangedRange(in: view, with: text)
+            context.coordinator.syncedText = text
         }
         if !hasMarkedText,
            view.selectedRange != selectedRange,
-           selectedRange.location <= (view.text as NSString).length {
+           NSMaxRange(selectedRange) <= view.textStorage.length {
             view.selectedRange = selectedRange
         }
-        view.backgroundColor = UIColor(theme.canvas)
-        view.textColor = UIColor(theme.textPrimary)
-        view.tintColor = UIColor(theme.accent)
+        if context.coordinator.lastTheme != theme {
+            context.coordinator.lastTheme = theme
+            view.backgroundColor = UIColor(theme.canvas)
+            view.tintColor = UIColor(theme.accent)
+        }
         let typographyChanged = context.coordinator.typographyChanged(
             readerTheme: readerTheme,
             bodySize: bodySize,
             textColor: UIColor(theme.textPrimary)
         )
         if !hasMarkedText, typographyChanged {
+            view.textColor = UIColor(theme.textPrimary)
             view.font = documentFont
             applyTypography(to: view)
             context.coordinator.recordTypography(
@@ -86,6 +102,33 @@ struct NativeMarkdownTextView: UIViewRepresentable {
                 view.becomeFirstResponder()
             }
             view.findInteraction?.presentFindNavigator(showingReplace: false)
+        }
+    }
+
+    // Puts the line holding the caret at the top of the editor once the view
+    // has a size, so an editor opened part-way through a document shows the
+    // passage the reader was showing. Everything above the caret is laid out
+    // first, so the offset is measured rather than estimated.
+    private func scrollToSelection(in view: UITextView) {
+        Task { @MainActor in
+            await Task.yield()
+            view.layoutIfNeeded()
+            view.layoutManager.ensureLayout(
+                forCharacterRange: NSRange(location: 0, length: view.selectedRange.location)
+            )
+            guard let caretPosition = view.selectedTextRange?.start else { return }
+            let caret = view.caretRect(for: caretPosition)
+            guard !caret.isNull, !caret.isInfinite else { return }
+            let top = -view.adjustedContentInset.top
+            let bottom = max(
+                top,
+                view.contentSize.height - view.bounds.height + view.adjustedContentInset.bottom
+            )
+            let target = caret.minY - view.textContainerInset.top - view.adjustedContentInset.top
+            view.setContentOffset(
+                CGPoint(x: view.contentOffset.x, y: min(max(target, top), bottom)),
+                animated: false
+            )
         }
     }
 
@@ -170,24 +213,57 @@ struct NativeMarkdownTextView: UIViewRepresentable {
     final class Coordinator: NSObject, UITextViewDelegate {
         var parent: NativeMarkdownTextView
         var lastFindTrigger = 0
+        var lastTheme: MarkdownTheme?
+        // The text last exchanged with the binding, in either direction.
+        var syncedText: String
+        // Set when an edit could not be reported yet because an input method
+        // was still composing.
+        private var hasUnreportedEdit = false
         private var lastReaderTheme: ReaderTheme?
         private var lastBodySize: Double?
         private var lastTextColor: UIColor?
 
         init(parent: NativeMarkdownTextView) {
             self.parent = parent
+            syncedText = parent.text
+            lastTheme = parent.theme
         }
 
         func textViewDidChange(_ textView: UITextView) {
+            hasUnreportedEdit = true
             synchronizeCommittedText(from: textView)
+        }
+
+        // Return inside a list item or quote continues it on the next line.
+        func textView(
+            _ textView: UITextView,
+            shouldChangeTextIn range: NSRange,
+            replacementText text: String
+        ) -> Bool {
+            guard text == "\n",
+                  textView.markedTextRange == nil,
+                  let edit = MarkdownLineEditing.continuingList(in: textView.text ?? "", selection: range),
+                  let start = textView.position(from: textView.beginningOfDocument, offset: edit.range.location),
+                  let end = textView.position(from: start, offset: edit.range.length),
+                  let textRange = textView.textRange(from: start, to: end) else {
+                return true
+            }
+            // Through UITextInput so the edit lands on the undo stack.
+            textView.replace(textRange, withText: edit.replacement)
+            textView.selectedRange = edit.selection
+            hasUnreportedEdit = true
+            synchronizeCommittedText(from: textView)
+            return false
         }
 
         func textViewDidChangeSelection(_ textView: UITextView) {
             guard textView.markedTextRange == nil else { return }
-            if parent.text != textView.text {
-                parent.text = textView.text
+            if hasUnreportedEdit {
+                reportText(from: textView)
             }
-            parent.selectedRange = textView.selectedRange
+            if parent.selectedRange != textView.selectedRange {
+                parent.selectedRange = textView.selectedRange
+            }
         }
 
         func textViewDidBeginEditing(_ textView: UITextView) {
@@ -221,8 +297,15 @@ struct NativeMarkdownTextView: UIViewRepresentable {
 
         private func synchronizeCommittedText(from textView: UITextView) {
             guard textView.markedTextRange == nil else { return }
-            parent.text = textView.text
+            reportText(from: textView)
             parent.selectedRange = textView.selectedRange
+        }
+
+        private func reportText(from textView: UITextView) {
+            let current = textView.text ?? ""
+            hasUnreportedEdit = false
+            syncedText = current
+            parent.text = current
         }
     }
 }

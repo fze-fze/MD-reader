@@ -7,12 +7,17 @@ struct MarkdownReaderView: View {
     let textScale: Double
     let baseURL: URL?
     let readerTheme: ReaderTheme
+    let position: ReadingPosition
+    let positionRestoreRevision: Int
     let onToggleTask: (Int) -> Void
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @ScaledMetric(relativeTo: .body) private var bodySize = 16.0
     @State private var blocks: [MarkdownBlock] = []
+    // The source `blocks` was parsed from, to tell a finished parse from one
+    // still on its way.
+    @State private var parsedSource: String?
 
     private var theme: MarkdownTheme {
         MarkdownTheme(readerTheme: readerTheme, colorScheme: colorScheme)
@@ -36,9 +41,11 @@ struct MarkdownReaderView: View {
                                 : nil,
                             onToggleTask: onToggleTask
                         )
+                            .equatable()
                             .id(block.id)
                     }
                 }
+                .scrollTargetLayout()
                 .frame(maxWidth: theme.contentMaxWidth, alignment: .leading)
                 .frame(maxWidth: .infinity)
                 .padding(.horizontal, horizontalSizeClass == .compact ? 20 : 32)
@@ -47,15 +54,27 @@ struct MarkdownReaderView: View {
             }
             .scrollIndicators(.hidden)
             .background(theme.canvas)
+            .onScrollTargetVisibilityChange(idType: Int.self, threshold: 0.01) { visibleIDs in
+                position.visibleBlockIDs = visibleIDs
+            }
+            .onChange(of: positionRestoreRevision) {
+                // With an unchanged document there is no parse to wait for.
+                if parsedSource == source {
+                    restorePendingPosition(using: proxy)
+                }
+            }
             .task(id: source) {
                 let sourceSnapshot = source
-                let result = await Task.detached(priority: .userInitiated) {
-                    let parsedBlocks = MarkdownParser.parse(sourceSnapshot)
-                    return (parsedBlocks, DocumentSearchIndex(blocks: parsedBlocks))
+                let parsedBlocks = await Task.detached(priority: .userInitiated) {
+                    MarkdownParser.parse(sourceSnapshot)
                 }.value
                 guard !Task.isCancelled else { return }
-                blocks = result.0
-                searchSession.replaceIndex(result.1)
+                // Only the parse stands between a source change and the
+                // screen; the search index is built when search asks for it.
+                blocks = parsedBlocks
+                parsedSource = sourceSnapshot
+                searchSession.replaceBlocks(parsedBlocks)
+                restorePendingPosition(using: proxy)
             }
             .onChange(of: scrollTarget) { _, target in
                 guard let target else { return }
@@ -70,15 +89,76 @@ struct MarkdownReaderView: View {
         }
     }
 
-    private func scrollToCurrentMatch(using proxy: ScrollViewProxy) {
-        guard let activeMatch = searchSession.activeMatch else { return }
+    // Brings the block holding the line the editor left off at on screen,
+    // unless the reader is already showing it.
+    private func restorePendingPosition(using proxy: ScrollViewProxy) {
+        guard let line = position.pendingLine else { return }
+        position.pendingLine = nil
+        guard let target = blocks.last(where: { $0.id <= line })?.id,
+              !position.visibleBlockIDs.contains(target) else { return }
+        // Animated like the outline jump: a lazy stack only knows estimated
+        // offsets for blocks it has not built, and settles on the real one
+        // as the animation brings them in.
         withAnimation(.snappy) {
-            proxy.scrollTo(activeMatch.blockID, anchor: .center)
+            proxy.scrollTo(target, anchor: .top)
+        }
+    }
+
+    private func scrollToCurrentMatch(using proxy: ScrollViewProxy) {
+        guard let activeMatch = searchSession.activeMatch,
+              let targetIndex = blocks.firstIndex(where: { $0.id == activeMatch.blockID }) else { return }
+        let target = activeMatch.blockID
+        let anchor = blocks[targetIndex].scrollAnchor(
+            forOccurrence: activeMatch.occurrenceIndex,
+            query: searchSession.effectiveQuery
+        )
+
+        let visible = position.visibleBlockIDs
+        if visible.contains(target) {
+            // Already on screen: move only as far as it takes to show the
+            // whole block (or, in a long one, the part holding the match).
+            withAnimation(.snappy) {
+                proxy.scrollTo(target, anchor: anchor)
+            }
+            return
+        }
+
+        let isNearby = visible.contains { visibleID in
+            guard let index = blocks.firstIndex(where: { $0.id == visibleID }) else { return false }
+            return abs(index - targetIndex) <= 24
+        }
+        if isNearby {
+            withAnimation(.snappy) {
+                proxy.scrollTo(target, anchor: anchor ?? .center)
+            }
+        } else {
+            // Far away the lazy stack only has estimated offsets, and an
+            // animation there sweeps through passages that have nothing to do
+            // with the search. Jump, then settle once the blocks around the
+            // target have been built and measured.
+            proxy.scrollTo(target, anchor: anchor ?? .center)
+            Task { @MainActor in
+                await Task.yield()
+                proxy.scrollTo(target, anchor: anchor ?? .center)
+            }
         }
     }
 }
 
-private struct MarkdownBlockView: View {
+private struct MarkdownBlockView: View, Equatable {
+    // Lets SwiftUI skip blocks whose inputs did not change when the document
+    // is re-parsed or the search state moves — a task toggle or a keystroke
+    // in the search field then redraws one block instead of every visible
+    // one. `onToggleTask` is left out: it captures only the document binding.
+    static func == (lhs: MarkdownBlockView, rhs: MarkdownBlockView) -> Bool {
+        lhs.block == rhs.block
+            && lhs.bodySize == rhs.bodySize
+            && lhs.theme == rhs.theme
+            && lhs.baseURL == rhs.baseURL
+            && lhs.searchText == rhs.searchText
+            && lhs.activeOccurrenceIndex == rhs.activeOccurrenceIndex
+    }
+
     let block: MarkdownBlock
     let bodySize: Double
     let theme: MarkdownTheme
@@ -110,12 +190,8 @@ private struct MarkdownBlockView: View {
             .accessibilityElement(children: .contain)
         case let .blockquote(text):
             quote(text)
-        case let .unorderedList(items):
-            list(items, ordered: false)
-        case let .orderedList(items):
-            list(items, ordered: true)
-        case let .taskList(items):
-            taskList(items)
+        case let .unorderedList(items), let .orderedList(items), let .taskList(items):
+            list(items)
         case let .code(language, source):
             if MermaidSupport.isMermaid(language: language) {
                 MermaidBlockView(
@@ -199,90 +275,122 @@ private struct MarkdownBlockView: View {
         .accessibilityLabel(L10n.format("reader.quote_accessibility", text))
     }
 
-    private func list(_ items: [MarkdownListItem], ordered: Bool) -> some View {
+    // One view for every list kind: each item draws its own marker (number,
+    // bullet or checkbox) and is indented by its nesting level, so mixed and
+    // nested lists need no special casing.
+    private func list(_ items: [MarkdownListItem]) -> some View {
         let offsets = fragmentOccurrenceOffsets
         let itemFonts = inlineUIFonts(size: bodySize)
-        return VStack(alignment: .leading, spacing: 7) {
+        let hasTasks = items.contains { $0.isChecked != nil }
+        return VStack(alignment: .leading, spacing: hasTasks ? 4 : 7) {
             ForEach(items.enumerated(), id: \.element.id) { itemIndex, item in
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(ordered ? "\(itemIndex + 1)." : "•")
-                        .font(documentFont(size: bodySize))
-                        .foregroundStyle(theme.textSecondary)
-                        .frame(minWidth: 20, alignment: .trailing)
-                    SelectableInlineText(
-                        source: item.text,
-                        fonts: itemFonts,
-                        mathFontSize: bodySize,
-                        foregroundColor: UIColor(theme.textPrimary),
-                        theme: theme,
-                        searchText: searchText,
-                        activeOccurrenceIndex: activeOccurrenceIndex,
-                        occurrenceOffset: occurrenceOffset(offsets, itemIndex),
-                        lineSpacing: bodySize * 0.38
-                    )
+                Group {
+                    if let isChecked = item.isChecked {
+                        taskRow(
+                            item,
+                            isChecked: isChecked,
+                            fonts: itemFonts,
+                            occurrenceOffset: occurrenceOffset(offsets, itemIndex)
+                        )
+                    } else {
+                        bulletRow(
+                            item,
+                            fonts: itemFonts,
+                            occurrenceOffset: occurrenceOffset(offsets, itemIndex)
+                        )
+                        // Lines up with the text of neighbouring task rows.
+                        .padding(.leading, hasTasks ? 14 : 0)
+                    }
                 }
+                .padding(.leading, Double(item.level) * bodySize * 1.5)
             }
         }
-        .padding(.leading, 2)
+        .padding(.leading, hasTasks ? 0 : 2)
         .padding(.vertical, bodySize * 0.39)
     }
 
-    private func taskList(_ items: [MarkdownListItem]) -> some View {
-        let offsets = fragmentOccurrenceOffsets
-        let itemFonts = inlineUIFonts(size: bodySize)
-        return VStack(alignment: .leading, spacing: 4) {
-            ForEach(items.enumerated(), id: \.element.id) { itemIndex, item in
-                HStack(alignment: .center, spacing: 0) {
-                    Button {
-                        onToggleTask(item.id)
-                    } label: {
-                        Image(systemName: item.isChecked == true ? "checkmark.square.fill" : "square")
-                            .foregroundStyle(item.isChecked == true ? theme.accent : theme.textSecondary)
-                            .font(.system(size: bodySize * 0.95))
-                            .contentTransition(.symbolEffect(.replace))
-                            .animation(
-                                reduceMotion ? nil : .snappy(duration: 0.18),
-                                value: item.isChecked
-                            )
-                    }
-                    .buttonStyle(.plain)
-                    .frame(width: 44, height: 44)
-                    .contentShape(.rect)
-                    .accessibilityLabel(item.text)
-                    .accessibilityValue(
-                        L10n.string(
-                            item.isChecked == true
-                                ? "reader.task.completed"
-                                : "reader.task.incomplete"
-                        )
-                    )
-                    .accessibilityHint(
-                        L10n.string(
-                            item.isChecked == true
-                                ? "reader.task.mark_incomplete_hint"
-                                : "reader.task.mark_completed_hint"
-                        )
-                    )
-                    .sensoryFeedback(.selection, trigger: item.isChecked)
-
-                    SelectableInlineText(
-                        source: item.text,
-                        fonts: itemFonts,
-                        mathFontSize: bodySize,
-                        foregroundColor: UIColor(
-                            item.isChecked == true ? theme.textSecondary : theme.textPrimary
-                        ),
-                        theme: theme,
-                        searchText: searchText,
-                        activeOccurrenceIndex: activeOccurrenceIndex,
-                        occurrenceOffset: occurrenceOffset(offsets, itemIndex)
-                    )
-                    .accessibilityHidden(true)
-                }
-                .frame(minHeight: 44)
-            }
+    private func bulletRow(
+        _ item: MarkdownListItem,
+        fonts: InlineMarkdownUIFonts,
+        occurrenceOffset: Int
+    ) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(listMarker(for: item))
+                .font(documentFont(size: bodySize))
+                .monospacedDigit()
+                .foregroundStyle(theme.textSecondary)
+                .frame(minWidth: 20, alignment: .trailing)
+            SelectableInlineText(
+                source: item.text,
+                fonts: fonts,
+                mathFontSize: bodySize,
+                foregroundColor: UIColor(theme.textPrimary),
+                theme: theme,
+                searchText: searchText,
+                activeOccurrenceIndex: activeOccurrenceIndex,
+                occurrenceOffset: occurrenceOffset,
+                lineSpacing: bodySize * 0.38
+            )
         }
-        .padding(.vertical, bodySize * 0.39)
+    }
+
+    private func listMarker(for item: MarkdownListItem) -> String {
+        if let ordinal = item.ordinal { return "\(ordinal)." }
+        return switch item.level {
+        case 0: "•"
+        case 1: "◦"
+        default: "▪"
+        }
+    }
+
+    private func taskRow(
+        _ item: MarkdownListItem,
+        isChecked: Bool,
+        fonts: InlineMarkdownUIFonts,
+        occurrenceOffset: Int
+    ) -> some View {
+        HStack(alignment: .center, spacing: 0) {
+            Button {
+                onToggleTask(item.id)
+            } label: {
+                Image(systemName: isChecked ? "checkmark.square.fill" : "square")
+                    .foregroundStyle(isChecked ? theme.accent : theme.textSecondary)
+                    .font(.system(size: bodySize * 0.95))
+                    .contentTransition(.symbolEffect(.replace))
+                    .animation(
+                        reduceMotion ? nil : .snappy(duration: 0.18),
+                        value: isChecked
+                    )
+            }
+            .buttonStyle(.plain)
+            .frame(width: 44, height: 44)
+            .contentShape(.rect)
+            .accessibilityLabel(item.text)
+            .accessibilityValue(
+                L10n.string(isChecked ? "reader.task.completed" : "reader.task.incomplete")
+            )
+            .accessibilityHint(
+                L10n.string(
+                    isChecked
+                        ? "reader.task.mark_incomplete_hint"
+                        : "reader.task.mark_completed_hint"
+                )
+            )
+            .sensoryFeedback(.selection, trigger: isChecked)
+
+            SelectableInlineText(
+                source: item.text,
+                fonts: fonts,
+                mathFontSize: bodySize,
+                foregroundColor: UIColor(isChecked ? theme.textSecondary : theme.textPrimary),
+                theme: theme,
+                searchText: searchText,
+                activeOccurrenceIndex: activeOccurrenceIndex,
+                occurrenceOffset: occurrenceOffset
+            )
+            .accessibilityHidden(true)
+        }
+        .frame(minHeight: 44)
     }
 
     private func codeBlock(language: String?, source: String) -> some View {

@@ -51,6 +51,14 @@ Parsing and search indexing run off the main actor via `Task.detached` in `Markd
 
 Scrolling re-evaluates every visible block's body, so anything expensive there is memoized: `InlineMarkdownStyler` (parsed+styled `AttributedString`), `InlineMathSegmenter` (lock-guarded — also reached off-main by search indexing), `MathRenderer` (formula images), and `MarkdownTypography.inlineFonts`. All are bounded and dropped on `applicationDidReceiveMemoryWarning`. Two rules follow: never call `MarkdownBlock.searchableFragments` from a view body (it re-parses markdown — `fragmentOccurrenceOffsets` computes prefix sums once per block and only while searching), and load images through `CachedAsyncImage`/`ReaderImageLoader` (both remote and document-relative) rather than decoding inline.
 
+### Line endings and mode switches
+
+A source line ends at `\n`, `\r\n` or `\r` — CRLF is **one** line. `MarkdownParser`, `SourceLines`, `MarkdownTaskToggler` and `DocumentStatistics` must agree on this, or block IDs drift from the lines that task toggling and annotations rewrite.
+
+`ReadingPosition` (owned by `DocumentWorkspaceView`) carries the place across reader ↔ editor: the reader reports its visible block IDs, the editor opens with its caret on that source line (`SourceLines.utf16Offset(ofLine:in:)`), and leaving the editor scrolls the reader back to the caret's line. The editor's `UITextView` is deliberately **TextKit 1** — TextKit 2 estimates unlaid-out heights, and after a jump into a long document taps resolve sections away from what is drawn.
+
+`MarkdownLineEditing` holds the editor's pure line edits (Return continuing a list/quote, accessory-bar prefix toggling) so they are testable without a text view.
+
 ### Math (LaTeX)
 
 Delimiters are `$` only, by design: display math is a standalone `$$…$$` line or a multi-line `$$` fence (`MarkdownBlock.Kind.math`; an unterminated opener stays a paragraph), inline math is `$…$` split out by `InlineMathSegmenter`. `\(…\)`, `\[…\]`, and mid-sentence `$$` are intentionally plain text. Inline code spans and `\$` escapes win over `$`, and a `$` span needs non-space-adjacent delimiters with no digit after the closer (so “$5 和 $10” stays text).
@@ -76,6 +84,10 @@ Print, PDF and HTML export embed the same pictures as base64 `<img class="diagra
 `DocumentSearchMatcher` is the single matching primitive (case-, diacritic-, width-insensitive).
 
 Search UI is an on-demand bottom `DocumentSearchBar` presented from the toolbar magnifier (in edit mode the same magnifier presents `UITextView`'s system find panel via a `findTrigger` counter instead) through a stable `safeAreaInset`; do not attach `.searchable` to the document workspace because the navigation drawer becomes permanently visible and can recreate the reader. `DocumentSearchSession` owns the debounced query, result count, current match, and navigation. Typing updates highlights and the count without moving the document; Return or the arrow buttons navigate results, and only matching blocks receive the effective query.
+
+Three things keep navigation from throwing the reader around, and each was a visible bug before: the first jump of a query goes to the nearest match at or below `ReadingPosition.topVisibleLine`, not to match 1; `MarkdownReaderView.scrollToCurrentMatch` animates only to a target near the screen and jumps (then re-settles a frame later) to a distant one, because the lazy stack's far offsets are estimates and animating over them sweeps through unrelated passages; and the query field is a `UITextField` (`DocumentSearchField`) whose Return keeps the keyboard up — SwiftUI's `TextField` resigns on submit and the reader resizes under the jump. For a block taller than the screen, `MarkdownBlock.scrollAnchor(forOccurrence:query:)` aims at the match instead of the block's middle.
+
+Speed: the index is built lazily when search opens, `InlinePlainText.strippedMarkdown` skips `AttributedString(markdown:)` for fragments with no inline syntax (keep `hasInlineSyntax` a superset of what the parser reacts to — the test compares both paths), and `DocumentSearchIndex.matches(for:) async` is `@concurrent` so matching leaves the main actor.
 
 ### Theming
 
@@ -104,6 +116,8 @@ The document menu's **Export** submenu offers Markdown / PDF / HTML; each writes
 ## Tests
 
 `MarginTests/MarkdownParserTests.swift` — swift-testing (`import Testing`, `@Test`, `#expect`), one file that currently covers the parser, statistics, search index, typography cascade, quick action, task toggler, share, print renderer, and mermaid detection/bundling/export. Tests that touch `DocumentSharePresenter` etc. need `@MainActor`.
+
+`MarkdownStructureTests.swift` covers block structure from real-world documents (CRLF, nested lists, ragged tables, fences, front matter vs. divider); `MarkdownLineEditingTests.swift` covers the editor's line edits and line/offset conversion.
 
 ## Conventions
 

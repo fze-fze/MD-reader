@@ -190,15 +190,11 @@ enum MarkdownPrintRenderer {
         case let .heading(level, text):
             return "<h\(level)>\(inline(text))</h\(level)>"
         case let .paragraph(text):
-            return "<p>\(inline(text))</p>"
+            return "<p>\(inline(text).replacingOccurrences(of: "\n", with: "<br>"))</p>"
         case let .blockquote(text):
             return "<blockquote><p>\(inline(text).replacingOccurrences(of: "\n", with: "<br>"))</p></blockquote>"
-        case let .unorderedList(items):
-            return list(items, tag: "ul", task: false, theme: theme, palette: palette)
-        case let .orderedList(items):
-            return list(items, tag: "ol", task: false, theme: theme, palette: palette)
-        case let .taskList(items):
-            return list(items, tag: "ul", task: true, theme: theme, palette: palette)
+        case let .unorderedList(items), let .orderedList(items), let .taskList(items):
+            return list(items, theme: theme, palette: palette)
         case let .code(language, source):
             // A rendered diagram prints as the picture the reader shows; one
             // that never rendered keeps printing as its fenced source.
@@ -239,24 +235,52 @@ enum MarkdownPrintRenderer {
 
     private static func list(
         _ items: [MarkdownListItem],
-        tag: String,
-        task: Bool,
         theme: ReaderTheme,
         palette: Palette
     ) -> String {
-        let checkedMarker = task ? taskMarkerTag(checked: true, palette: palette) : nil
-        let uncheckedMarker = task ? taskMarkerTag(checked: false, palette: palette) : nil
-        let contents = items.map { item in
+        guard let first = items.first else { return "" }
+        var index = 0
+        return nestedList(items, index: &index, level: first.level, theme: theme, palette: palette)
+    }
+
+    // Emits the run of items at `level` as one <ul>/<ol>, nesting deeper runs
+    // inside the item they follow. The run's first item picks the list type.
+    private static func nestedList(
+        _ items: [MarkdownListItem],
+        index: inout Int,
+        level: Int,
+        theme: ReaderTheme,
+        palette: Palette
+    ) -> String {
+        var contents = ""
+        var hasTask = false
+        let ordered = items[index].ordinal != nil
+        let start = items[index].ordinal ?? 1
+
+        while index < items.count, items[index].level >= level {
+            let item = items[index]
+            index += 1
+
             var marker = ""
-            if task {
-                let checked = item.isChecked == true
-                marker = (checked ? checkedMarker : uncheckedMarker)
-                    ?? "<span class=\"task-marker\">\(checked ? "&#9745;" : "&#9744;")</span>"
+            if let isChecked = item.isChecked {
+                hasTask = true
+                marker = taskMarkerTag(checked: isChecked, palette: palette)
+                    ?? "<span class=\"task-marker\">\(isChecked ? "&#9745;" : "&#9744;")</span>"
             }
-            return "<li>\(marker)\(inline(item.text, theme: theme, palette: palette))</li>"
-        }.joined()
-        let className = task ? " class=\"task-list\"" : ""
-        return "<\(tag)\(className)>\(contents)</\(tag)>"
+            let text = inline(item.text, theme: theme, palette: palette)
+                .replacingOccurrences(of: "\n", with: "<br>")
+            var nested = ""
+            if index < items.count, items[index].level > level {
+                nested = nestedList(items, index: &index, level: items[index].level, theme: theme, palette: palette)
+            }
+            contents += "<li>\(marker)\(text)\(nested)</li>"
+        }
+
+        if ordered {
+            let startAttribute = start == 1 ? "" : " start=\"\(start)\""
+            return "<ol\(startAttribute)>\(contents)</ol>"
+        }
+        return "<ul\(hasTask ? " class=\"task-list\"" : "")>\(contents)</ul>"
     }
 
     // The reader draws task markers with SF Symbols; embedding the same

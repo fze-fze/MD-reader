@@ -89,7 +89,25 @@ nonisolated enum InlinePlainText {
         return mappings
     }
 
+    // Characters inline Markdown can act on. Text without any of them renders
+    // as itself, which is most list items and table cells, so the search
+    // index skips the Markdown parser for them.
+    private static func hasInlineSyntax(_ source: String) -> Bool {
+        source.utf8.contains { byte in
+            switch byte {
+            case UInt8(ascii: "*"), UInt8(ascii: "_"), UInt8(ascii: "`"), UInt8(ascii: "["),
+                 UInt8(ascii: "]"), UInt8(ascii: "\\"), UInt8(ascii: "<"), UInt8(ascii: ">"),
+                 UInt8(ascii: "&"), UInt8(ascii: "~"), UInt8(ascii: "!"), UInt8(ascii: "\n"),
+                 UInt8(ascii: "\r"):
+                true
+            default:
+                false
+            }
+        }
+    }
+
     static func strippedMarkdown(_ source: String) -> String {
+        guard hasInlineSyntax(source) else { return source }
         guard let attributed = try? AttributedString(
             markdown: source,
             options: AttributedString.MarkdownParsingOptions(

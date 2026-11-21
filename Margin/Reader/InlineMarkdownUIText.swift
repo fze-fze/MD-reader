@@ -36,8 +36,20 @@ enum InlineMarkdownUIText {
 
     private static var cache: [CacheKey: NSAttributedString] = [:]
 
+    // The finished string for a fragment that is not being searched. Returning
+    // the same instance lets the text view tell "nothing changed" by identity
+    // instead of comparing — or rebuilding — the whole string on every update.
+    private struct RenderedCacheKey: Hashable {
+        let base: CacheKey
+        let lineSpacing: Double
+        let alignment: NSTextAlignment
+    }
+
+    private static var renderedCache: [RenderedCacheKey: Rendered] = [:]
+
     static func purgeCache() {
         cache.removeAll()
+        renderedCache.removeAll()
     }
 
     static func rendered(
@@ -52,6 +64,24 @@ enum InlineMarkdownUIText {
         lineSpacing: Double = 0,
         paragraphAlignment: NSTextAlignment = .natural
     ) -> Rendered {
+        let renderedKey = searchText.isEmpty
+            ? RenderedCacheKey(
+                base: CacheKey(
+                    source: source,
+                    fonts: fonts,
+                    readerTheme: theme.readerTheme,
+                    colorScheme: theme.colorScheme,
+                    foregroundColor: foregroundColor,
+                    mathFontSize: mathFontSize
+                ),
+                lineSpacing: lineSpacing,
+                alignment: paragraphAlignment
+            )
+            : nil
+        if let renderedKey, let cached = renderedCache[renderedKey] {
+            return cached
+        }
+
         let result = NSMutableAttributedString()
         var annotations: [AnnotationRun] = []
         var accumulatedMatches = 0
@@ -112,7 +142,14 @@ enum InlineMarkdownUIText {
             range: NSRange(location: 0, length: result.length)
         )
 
-        return Rendered(text: result, annotations: annotations)
+        let rendered = Rendered(text: result, annotations: annotations)
+        if let renderedKey {
+            if renderedCache.count > 500 {
+                renderedCache.removeAll(keepingCapacity: true)
+            }
+            renderedCache[renderedKey] = rendered
+        }
+        return rendered
     }
 
     // MARK: - Inline Markdown

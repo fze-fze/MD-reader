@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MarkdownEditorView: View {
     @Binding var text: String
+    let position: ReadingPosition
     let textScale: Double
     @Binding var isFocused: Bool
     let findTrigger: Int
@@ -9,7 +10,7 @@ struct MarkdownEditorView: View {
 
     @Environment(\.colorScheme) private var colorScheme
     @ScaledMetric(relativeTo: .body) private var bodySize = 16.0
-    @State private var selectedRange = NSRange(location: 0, length: 0)
+    @State private var selectedRange: NSRange
 
     // The editor owns a synchronous mirror of the document text. Feeding the
     // UITextView from the DocumentGroup binding directly lets a stale binding
@@ -21,6 +22,8 @@ struct MarkdownEditorView: View {
 
     init(
         text: Binding<String>,
+        initialLocation: Int,
+        position: ReadingPosition,
         textScale: Double,
         isFocused: Binding<Bool>,
         findTrigger: Int,
@@ -28,6 +31,8 @@ struct MarkdownEditorView: View {
     ) {
         _text = text
         _editorText = State(initialValue: text.wrappedValue)
+        _selectedRange = State(initialValue: NSRange(location: initialLocation, length: 0))
+        self.position = position
         self.textScale = textScale
         _isFocused = isFocused
         self.findTrigger = findTrigger
@@ -55,6 +60,9 @@ struct MarkdownEditorView: View {
             if text != updatedText {
                 text = updatedText
             }
+        }
+        .onChange(of: selectedRange) { _, range in
+            position.editorCaretLocation = range.location
         }
         .safeAreaBar(edge: .bottom) {
             if isFocused {
@@ -101,9 +109,9 @@ struct MarkdownEditorView: View {
                 suffix: "$",
                 placeholder: L10n.string("editor.placeholder.math")
             )
-        case .quote: prefixCurrentLine("> ")
-        case .list: prefixCurrentLine("- ")
-        case .task: prefixCurrentLine("- [ ] ")
+        case .quote: toggleLinePrefix(.quote)
+        case .list: toggleLinePrefix(.list)
+        case .task: toggleLinePrefix(.task)
         case .mathBlock:
             insertMathBlock(placeholder: L10n.string("editor.placeholder.math"))
         }
@@ -136,12 +144,10 @@ struct MarkdownEditorView: View {
         selectedRange = NSRange(location: selectedRange.location + prefixLength, length: contentLength)
     }
 
-    private func prefixCurrentLine(_ prefix: String) {
-        let nsText = editorText as NSString
-        let safeLocation = min(selectedRange.location, nsText.length)
-        let lineRange = nsText.lineRange(for: NSRange(location: safeLocation, length: 0))
-        editorText = nsText.replacingCharacters(in: NSRange(location: lineRange.location, length: 0), with: prefix)
-        selectedRange.location += (prefix as NSString).length
+    private func toggleLinePrefix(_ prefix: MarkdownLineEditing.Prefix) {
+        let edit = MarkdownLineEditing.togglingPrefix(prefix, in: editorText, selection: selectedRange)
+        editorText = (editorText as NSString).replacingCharacters(in: edit.range, with: edit.replacement)
+        selectedRange = edit.selection
     }
 
     // Display math must sit on standalone $$ lines for the parser to pick it

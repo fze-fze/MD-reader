@@ -25,7 +25,15 @@ final class DocumentSearchSession {
     private(set) var navigationRevision = 0
     private(set) var isActive = false
 
-    private var index = DocumentSearchIndex()
+    // The index costs an inline-Markdown parse per block, so it is built from
+    // `blocks` off the main actor the first time search needs it rather than
+    // on every document change.
+    @ObservationIgnored private var blocks: [MarkdownBlock] = []
+    @ObservationIgnored private var index: DocumentSearchIndex? = DocumentSearchIndex()
+    @ObservationIgnored private var indexBuild: (revision: Int, task: Task<DocumentSearchIndex, Never>)?
+    // Where the reader is, so the first jump of a search goes to the nearest
+    // match rather than to the top of the document.
+    @ObservationIgnored weak var readingPosition: ReadingPosition?
     private var indexRevision = 0
     private var searchRevision = 0
 
@@ -35,7 +43,13 @@ final class DocumentSearchSession {
     var currentMatchIndex: Int? { results.currentMatchIndex }
 
     var request: Request {
-        Request(indexRevision: indexRevision, query: query, isActive: isActive)
+        // Trimmed, as the search itself is: a trailing space is not a new
+        // query.
+        Request(
+            indexRevision: indexRevision,
+            query: query.trimmingCharacters(in: .whitespacesAndNewlines),
+            isActive: isActive
+        )
     }
 
     var activeMatch: DocumentSearchIndex.Match? {
@@ -65,13 +79,56 @@ final class DocumentSearchSession {
     }
 
     func replaceIndex(_ index: DocumentSearchIndex) {
+        blocks = []
         self.index = index
+        indexBuild = nil
         indexRevision &+= 1
         resetResults()
     }
 
+    func replaceBlocks(_ blocks: [MarkdownBlock]) {
+        self.blocks = blocks
+        index = nil
+        indexBuild = nil
+        indexRevision &+= 1
+        resetResults()
+        if isActive { warmIndex() }
+    }
+
     func activate() {
         isActive = true
+        // Start indexing while the user is still typing the query.
+        warmIndex()
+    }
+
+    private func warmIndex() {
+        guard index == nil else { return }
+        Task { _ = await currentIndex() }
+    }
+
+    // The index for the current blocks, built at most once per revision no
+    // matter how many searches are waiting on it. Nil when the document
+    // changed underneath the build.
+    private func currentIndex() async -> DocumentSearchIndex? {
+        if let index { return index }
+
+        let revision = indexRevision
+        let build: Task<DocumentSearchIndex, Never>
+        if let indexBuild, indexBuild.revision == revision {
+            build = indexBuild.task
+        } else {
+            let snapshot = blocks
+            build = Task.detached(priority: .userInitiated) {
+                DocumentSearchIndex(blocks: snapshot)
+            }
+            indexBuild = (revision, build)
+        }
+
+        let built = await build.value
+        guard revision == indexRevision else { return nil }
+        index = built
+        indexBuild = nil
+        return built
     }
 
     func deactivate() {
@@ -101,14 +158,16 @@ final class DocumentSearchSession {
             }
         }
 
+        // Just long enough to coalesce a burst of keystrokes; a superseded
+        // search is cancelled anyway.
         do {
-            try await Task.sleep(for: .milliseconds(180))
+            try await Task.sleep(for: .milliseconds(60))
         } catch {
             return
         }
         guard !Task.isCancelled, isActive else { return }
 
-        let indexSnapshot = index
+        guard let indexSnapshot = await currentIndex() else { return }
         let results: [DocumentSearchIndex.Match]
         do {
             results = try await indexSnapshot.matches(for: querySnapshot)
@@ -138,7 +197,7 @@ final class DocumentSearchSession {
         if let currentMatchIndex {
             results.currentMatchIndex = (currentMatchIndex + 1) % matches.count
         } else {
-            results.currentMatchIndex = 0
+            results.currentMatchIndex = firstMatchIndexFromReadingPosition ?? 0
         }
         navigationRevision &+= 1
     }
@@ -148,9 +207,17 @@ final class DocumentSearchSession {
         if let currentMatchIndex {
             results.currentMatchIndex = (currentMatchIndex - 1 + matches.count) % matches.count
         } else {
-            results.currentMatchIndex = matches.count - 1
+            let next = firstMatchIndexFromReadingPosition ?? 0
+            results.currentMatchIndex = (next - 1 + matches.count) % matches.count
         }
         navigationRevision &+= 1
+    }
+
+    // The first match on or below the top of what the reader is showing.
+    // Matches are in document order, as are block IDs.
+    private var firstMatchIndexFromReadingPosition: Int? {
+        guard let topLine = readingPosition?.topVisibleLine else { return nil }
+        return matches.firstIndex { $0.blockID >= topLine }
     }
 
     func clear() {

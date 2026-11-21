@@ -8,7 +8,7 @@ struct DocumentStatistics {
 
     init(source: String) {
         characters = source.count
-        lines = max(1, source.components(separatedBy: .newlines).count)
+        lines = source.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline).count
 
         let latinWords = source.split { character in
             character.isWhitespace || character.isPunctuation || character.isNewline

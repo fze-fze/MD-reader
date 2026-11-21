@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct MarkdownTheme {
+struct MarkdownTheme: Equatable {
     let readerTheme: ReaderTheme
     let colorScheme: ColorScheme
 

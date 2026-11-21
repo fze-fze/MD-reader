@@ -98,11 +98,17 @@ struct SourceLinesTests {
     }
 
     @Test func numbersLinesLikeTheParser() {
-        // CharacterSet.newlines treats CR and LF separately, so CRLF yields an
-        // empty line between — the parser's convention, which line-indexed
+        // CRLF ends one line — the parser's convention, which line-indexed
         // block IDs depend on.
-        #expect(SourceLines.split("a\r\nb").map(\.text) == ["a", "", "b"])
-        #expect(SourceLines.split("a\r\nb").map(\.text) == "a\r\nb".components(separatedBy: .newlines))
+        #expect(SourceLines.split("a\r\nb").map(\.text) == ["a", "b"])
+        #expect(SourceLines.split("a\r\nb").map(\.terminator) == ["\r\n", ""])
+        #expect(SourceLines.split("a\n\rb\r").map(\.text) == ["a", "", "b", ""])
+
+        let source = "# Title\r\n\r\nBody\r\n- [ ] Task"
+        let ids = MarkdownParser.parse(source).map(\.id)
+        let lines = SourceLines.split(source).map(\.text)
+        #expect(ids == [0, 2, 3])
+        #expect(lines[3] == "- [ ] Task")
     }
 }
 

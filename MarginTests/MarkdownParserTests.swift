@@ -109,6 +109,73 @@ struct MarkdownParserTests {
         #expect(session.effectiveQuery.isEmpty)
     }
 
+    @Test @MainActor func firstSearchJumpStartsFromTheReadingPosition() async {
+        let blocks = MarkdownParser.parse("alpha\n\nbeta\n\nalpha\n\ngamma\n\nalpha")
+        let position = ReadingPosition()
+        position.visibleBlockIDs = [3, 4, 6]
+        let session = DocumentSearchSession()
+        session.readingPosition = position
+        session.replaceIndex(DocumentSearchIndex(blocks: blocks))
+        session.activate()
+        session.query = "alpha"
+        await session.performSearch()
+
+        #expect(session.matches.map(\.blockID) == [0, 4, 8])
+        #expect(session.activeMatch == nil)
+
+        session.moveToNext()
+        #expect(session.activeMatch?.blockID == 4)
+        session.moveToNext()
+        #expect(session.activeMatch?.blockID == 8)
+
+        // A new query starts over from where the reader is, and going
+        // backwards first lands on the match above it.
+        session.query = "alph"
+        await session.performSearch()
+        #expect(session.activeMatch == nil)
+        session.moveToPrevious()
+        #expect(session.activeMatch?.blockID == 0)
+
+        // Nothing at or below the reading position: wrap to the first match.
+        position.visibleBlockIDs = [9]
+        session.query = "alpha"
+        await session.performSearch()
+        session.moveToNext()
+        #expect(session.activeMatch?.blockID == 0)
+    }
+
+    @Test func plainTextSkipsTheInlineParserWithoutChangingTheResult() throws {
+        let samples = [
+            "plain 文本 123", "a (b) c: d; e, f.", "100% #tag @me $5 ^ = + | {x} 'q' \"q\" ? / -",
+            "  lead and trail  ", "http://example.com/a?b=c", "www.example.com", "tab\there",
+            "em—dash … “quotes”", "a -- b --- c", "1. x", "# h", "- x", "+ x",
+            "**bold** and `code`", "[link](https://example.com)", "a_b_c", "x < y &amp; z", "a\\*b",
+        ]
+        for sample in samples {
+            let attributed = try AttributedString(
+                markdown: sample,
+                options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
+            )
+            #expect(InlinePlainText.strippedMarkdown(sample) == String(attributed.characters))
+        }
+    }
+
+    @Test func longBlocksAnchorTheScrollOnTheMatchItself() throws {
+        let lines = (1...40).map { "let line\($0) = \($0)" }
+        let source = "short needle\n\n```swift\n" + lines.joined(separator: "\n") + "\nneedle\n```"
+        let blocks = MarkdownParser.parse(source)
+        let paragraph = try #require(blocks.first)
+        let code = try #require(blocks.last)
+
+        #expect(paragraph.scrollAnchor(forOccurrence: 0, query: "needle") == nil)
+
+        let top = try #require(code.scrollAnchor(forOccurrence: 0, query: "line1"))
+        #expect(top.y < 0.05)
+        let bottom = try #require(code.scrollAnchor(forOccurrence: 0, query: "needle"))
+        #expect(bottom.y > 0.9)
+        #expect(code.scrollAnchor(forOccurrence: 5, query: "needle") == nil)
+    }
+
     @Test @MainActor func closingSearchDiscardsAnInFlightQuery() async {
         let blocks = MarkdownParser.parse("Alpha beta alpha")
         let session = DocumentSearchSession()
@@ -437,11 +504,13 @@ struct MarkdownParserTests {
             return items.map(\.id)
         }
 
-        #expect(taskLines == [0, 2])
+        // CRLF ends one line, so the second task is line 1.
+        #expect(taskLines == [0, 1])
         #expect(MarkdownTaskToggler.toggledSource(source, taskAtLine: taskLines[0]) ==
             "- [x] First\r\n  * [X] Second\r\nParagraph")
         #expect(MarkdownTaskToggler.toggledSource(source, taskAtLine: taskLines[1]) ==
             "- [ ] First\r\n  * [ ] Second\r\nParagraph")
+        #expect(MarkdownTaskToggler.toggledSource(source, taskAtLine: 2) == source)
         #expect(MarkdownTaskToggler.toggledSource(source, taskAtLine: 4) == source)
     }
 
