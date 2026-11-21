@@ -105,9 +105,42 @@ struct MarkdownReaderView: View {
     }
 
     private func scrollToCurrentMatch(using proxy: ScrollViewProxy) {
-        guard let activeMatch = searchSession.activeMatch else { return }
-        withAnimation(.snappy) {
-            proxy.scrollTo(activeMatch.blockID, anchor: .center)
+        guard let activeMatch = searchSession.activeMatch,
+              let targetIndex = blocks.firstIndex(where: { $0.id == activeMatch.blockID }) else { return }
+        let target = activeMatch.blockID
+        let anchor = blocks[targetIndex].scrollAnchor(
+            forOccurrence: activeMatch.occurrenceIndex,
+            query: searchSession.effectiveQuery
+        )
+
+        let visible = position.visibleBlockIDs
+        if visible.contains(target) {
+            // Already on screen: move only as far as it takes to show the
+            // whole block (or, in a long one, the part holding the match).
+            withAnimation(.snappy) {
+                proxy.scrollTo(target, anchor: anchor)
+            }
+            return
+        }
+
+        let isNearby = visible.contains { visibleID in
+            guard let index = blocks.firstIndex(where: { $0.id == visibleID }) else { return false }
+            return abs(index - targetIndex) <= 24
+        }
+        if isNearby {
+            withAnimation(.snappy) {
+                proxy.scrollTo(target, anchor: anchor ?? .center)
+            }
+        } else {
+            // Far away the lazy stack only has estimated offsets, and an
+            // animation there sweeps through passages that have nothing to do
+            // with the search. Jump, then settle once the blocks around the
+            // target have been built and measured.
+            proxy.scrollTo(target, anchor: anchor ?? .center)
+            Task { @MainActor in
+                await Task.yield()
+                proxy.scrollTo(target, anchor: anchor ?? .center)
+            }
         }
     }
 }

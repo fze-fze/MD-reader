@@ -31,6 +31,9 @@ final class DocumentSearchSession {
     @ObservationIgnored private var blocks: [MarkdownBlock] = []
     @ObservationIgnored private var index: DocumentSearchIndex? = DocumentSearchIndex()
     @ObservationIgnored private var indexBuild: (revision: Int, task: Task<DocumentSearchIndex, Never>)?
+    // Where the reader is, so the first jump of a search goes to the nearest
+    // match rather than to the top of the document.
+    @ObservationIgnored weak var readingPosition: ReadingPosition?
     private var indexRevision = 0
     private var searchRevision = 0
 
@@ -40,7 +43,13 @@ final class DocumentSearchSession {
     var currentMatchIndex: Int? { results.currentMatchIndex }
 
     var request: Request {
-        Request(indexRevision: indexRevision, query: query, isActive: isActive)
+        // Trimmed, as the search itself is: a trailing space is not a new
+        // query.
+        Request(
+            indexRevision: indexRevision,
+            query: query.trimmingCharacters(in: .whitespacesAndNewlines),
+            isActive: isActive
+        )
     }
 
     var activeMatch: DocumentSearchIndex.Match? {
@@ -149,8 +158,10 @@ final class DocumentSearchSession {
             }
         }
 
+        // Just long enough to coalesce a burst of keystrokes; a superseded
+        // search is cancelled anyway.
         do {
-            try await Task.sleep(for: .milliseconds(180))
+            try await Task.sleep(for: .milliseconds(60))
         } catch {
             return
         }
@@ -186,7 +197,7 @@ final class DocumentSearchSession {
         if let currentMatchIndex {
             results.currentMatchIndex = (currentMatchIndex + 1) % matches.count
         } else {
-            results.currentMatchIndex = 0
+            results.currentMatchIndex = firstMatchIndexFromReadingPosition ?? 0
         }
         navigationRevision &+= 1
     }
@@ -196,9 +207,17 @@ final class DocumentSearchSession {
         if let currentMatchIndex {
             results.currentMatchIndex = (currentMatchIndex - 1 + matches.count) % matches.count
         } else {
-            results.currentMatchIndex = matches.count - 1
+            let next = firstMatchIndexFromReadingPosition ?? 0
+            results.currentMatchIndex = (next - 1 + matches.count) % matches.count
         }
         navigationRevision &+= 1
+    }
+
+    // The first match on or below the top of what the reader is showing.
+    // Matches are in document order, as are block IDs.
+    private var firstMatchIndexFromReadingPosition: Int? {
+        guard let topLine = readingPosition?.topVisibleLine else { return nil }
+        return matches.firstIndex { $0.blockID >= topLine }
     }
 
     func clear() {

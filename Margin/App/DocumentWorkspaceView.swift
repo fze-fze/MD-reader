@@ -207,6 +207,7 @@ struct DocumentWorkspaceView: View {
         if mode == .edit {
             editorFindTrigger &+= 1
         } else {
+            searchSession.readingPosition = readingPosition
             searchSession.activate()
             isSearchPresented = true
         }

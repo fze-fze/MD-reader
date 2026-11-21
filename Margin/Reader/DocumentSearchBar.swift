@@ -5,21 +5,17 @@ struct DocumentSearchBar: View {
     let theme: MarkdownTheme
     let onDismiss: () -> Void
 
-    @FocusState private var isFocused: Bool
-    @State private var selection: TextSelection?
-
     var body: some View {
         HStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(theme.textSecondary)
                 .accessibilityHidden(true)
 
-            TextField("workspace.search_prompt", text: $session.query, selection: $selection)
-                .focused($isFocused)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .submitLabel(.search)
-                .onSubmit(session.moveToNext)
+            DocumentSearchField(
+                text: $session.query,
+                theme: theme,
+                onReturn: session.moveToNext
+            )
 
             searchStatus
 
@@ -61,17 +57,6 @@ struct DocumentSearchBar: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
         .background(theme.canvas)
-        .task {
-            await Task.yield()
-            isFocused = true
-        }
-        .onChange(of: isFocused) { _, focused in
-            // The previous query is kept, selected, so typing replaces it
-            // instead of appending to it. A selection only sticks once the
-            // field is the first responder.
-            guard focused, !session.query.isEmpty else { return }
-            selection = TextSelection(range: session.query.startIndex..<session.query.endIndex)
-        }
         .task(id: session.request) {
             await session.performSearch()
         }
@@ -80,7 +65,9 @@ struct DocumentSearchBar: View {
     @ViewBuilder
     private var searchStatus: some View {
         Group {
-            if session.isSearching {
+            // While a new query is running the previous count stays up; the
+            // spinner is only for a search with nothing to show yet.
+            if session.isSearching, session.effectiveQuery.isEmpty {
                 ProgressView()
                     .controlSize(.small)
                     .accessibilityLabel(L10n.string("workspace.search"))

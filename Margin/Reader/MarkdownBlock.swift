@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 nonisolated struct MarkdownBlock: Identifiable, Equatable, Sendable {
     // 0-based index of the block's first source line. Outline jumps and task
@@ -52,6 +53,33 @@ nonisolated struct MarkdownBlock: Identifiable, Equatable, Sendable {
         case .divider:
             []
         }
+    }
+
+    // Where in the block a search occurrence sits, as a scroll anchor, for
+    // blocks long enough to outgrow the screen: aligning that point with the
+    // same point of the viewport shows the match rather than the block's
+    // middle. Nil for a block short enough to show whole.
+    func scrollAnchor(forOccurrence occurrenceIndex: Int, query: String) -> UnitPoint? {
+        let fragments = searchableFragments
+        let total = fragments.reduce(0) { $0 + $1.count }
+        let lineCount = fragments.reduce(0) { $0 + $1.split(whereSeparator: \.isNewline).count }
+        guard total > 600 || lineCount > 12 else { return nil }
+
+        var seen = 0
+        var preceding = 0
+        for fragment in fragments {
+            let ranges = DocumentSearchMatcher.ranges(in: fragment, query: query)
+            if occurrenceIndex < seen + ranges.count {
+                let offset = fragment.distance(
+                    from: fragment.startIndex,
+                    to: ranges[occurrenceIndex - seen].lowerBound
+                )
+                return UnitPoint(x: 0.5, y: Double(preceding + offset) / Double(max(total, 1)))
+            }
+            seen += ranges.count
+            preceding += fragment.count
+        }
+        return nil
     }
 
     // Search matches what the reader draws, so annotation markers and their

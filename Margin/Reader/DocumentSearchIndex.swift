@@ -33,9 +33,11 @@ nonisolated struct DocumentSearchIndex: Equatable, Sendable {
         (try? collectMatches(for: query)) ?? []
     }
 
+    // `@concurrent`: a nonisolated async function otherwise runs on its
+    // caller's actor, which for the search session is the main one.
+    @concurrent
     func matches(for query: String) async throws -> [Match] {
-        await Task.yield()
-        return try collectMatches(for: query) {
+        try collectMatches(for: query) {
             try Task.checkCancellation()
         }
     }
