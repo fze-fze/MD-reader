@@ -33,7 +33,8 @@ struct MermaidBlockView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text(verbatim: "MERMAID")
-                    .font(.caption)
+                    .font(.system(.caption2, design: theme.codeFont, weight: .medium))
+                    .tracking(0.6)
                     .foregroundStyle(theme.textSecondary)
                 Spacer()
                 if renderFailure == nil {
@@ -43,6 +44,7 @@ struct MermaidBlockView: View {
                     CodeCopyButton(source: source, theme: theme)
                 }
             }
+            .padding(.vertical, -6)
             content
         }
         .padding(.horizontal, 16)

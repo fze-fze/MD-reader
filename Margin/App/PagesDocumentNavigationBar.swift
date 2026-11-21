@@ -51,13 +51,22 @@ struct PagesDocumentNavigationBar: View {
         .foregroundStyle(theme.navigationControl)
         .padding(.horizontal, 16)
         .padding(.vertical, 6)
+        // No bar chrome: the document fades out under the floating glass
+        // controls instead of being cut off by an opaque band.
         .background {
-            ZStack {
-                Rectangle()
-                    .fill(.ultraThinMaterial)
-                theme.navigationSurface
-            }
+            LinearGradient(
+                stops: [
+                    .init(color: theme.canvas, location: 0),
+                    .init(color: theme.canvas.opacity(0.94), location: 0.7),
+                    .init(color: theme.canvas.opacity(0.5), location: 0.86),
+                    .init(color: theme.canvas.opacity(0), location: 1)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .padding(.bottom, -24)
             .ignoresSafeArea(edges: .top)
+            .allowsHitTesting(false)
         }
     }
 }
