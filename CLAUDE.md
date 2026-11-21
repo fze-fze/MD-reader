@@ -99,13 +99,13 @@ Persistence is three `@AppStorage` keys, declared in `DocumentWorkspaceView`: `r
 
 ### Localization
 
-`en` is the Xcode **development language** and `zh-Hans` is a complete translation. There is no in-app language switch; iOS chooses the best available localization from the user's preferred languages.
+`en` is the Xcode **development language**. The app ships `en`, `zh-Hans`, `zh-Hant`, `ja`, `ko`, and `es`. iOS selects the best match for the user's preferred languages or per-app language setting. The App Language button in Reading Settings opens iOS Settings; `UIPrefersShowingLanguageSettings` makes the per-app language setting visible even with one system language. Do not override `AppleLanguages` or mutate the bundle at runtime.
 
 - SwiftUI: pass semantic keys as `LocalizedStringKey` literals (`Button("workspace.search", …)`).
 - UIKit / plain `String`: `L10n.string("key")` / `L10n.format("key", args…)`.
-- Info.plist values (`CFBundleTypeName`, `UTTypeDescription`, `UIApplicationShortcutItemTitle`) are localized through `InfoPlist.strings`, not by editing `Info.plist`.
+- Info.plist values (`CFBundleTypeName` and `UTTypeDescription`) are localized through `InfoPlist.strings`, not by editing `Info.plist`.
 
-**Every new user-facing string must be added to both `Margin/zh-Hans.lproj/Localizable.strings` and `Margin/en.lproj/Localizable.strings`** — the two files must stay key-for-key identical. Nothing enforces this automatically.
+Add every new user-facing string to `Localizable.strings` in each `Margin/*.lproj` directory. Keep keys and format arguments consistent across languages; `LocalizationTests` checks the resources in the built app. Xcode's synchronized group picks up the resource files; register new language codes under `knownRegions`.
 
 ### Printing
 

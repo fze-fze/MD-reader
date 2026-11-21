@@ -32,6 +32,8 @@
 "settings.body_size" = "正文大小";
 "settings.reset_typography" = "恢复默认排版";
 "settings.title" = "阅读设置";
+"settings.app_language" = "App 语言";
+"settings.app_language_hint" = "前往“设置 → App → Margin → 语言”更改界面语言。";
 
 "theme.picker.title" = "选取主题";
 "theme.picker.hint" = "选择此文稿主题";
